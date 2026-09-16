@@ -17,15 +17,15 @@ plus draw calls. Median of 3 runs of 180 frames each.
 | scenario | nodes | drawn/frame | render p50 (ms) | p95 | run spread |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `pan-close` | 100,000 | 584 | **0.2** | 0.3 | ±0% |
-| `pan-mid` | 100,000 | 5,707 | **1.9** | 2.6 | ±11% |
-| `zoom-cycle` | 100,000 | 13,922 | **0.7** | 18.6 | ±17% |
-| `overview` | 100,000 | 97,619 | **13.8** | 16.9 | ±11% |
+| `pan-mid` | 100,000 | 5,707 | **1.9** | 2.3 | ±16% |
+| `zoom-cycle` | 100,000 | 13,922 | **0.7** | 19.6 | ±14% |
+| `overview` | 100,000 | 97,619 | **13.8** | 17.5 | ±14% |
 | `pan-mid` | 10,000 | 580 | **0.2** | 0.3 | ±0% |
 
-- Viewport query over 100,000 nodes: **44 µs** indexed vs 621 µs for a full
-  scan (**14x**), returning ~1,027 hits.
-- The worst case — everything on screen at once — went from 46 ms to
-  13.8 ms (**3.3x**) via draw-call batching and sub-pixel LOD.
+- Viewport query over 100,000 nodes: **40 µs** indexed vs 589 µs for a full
+  scan (**15x**), returning ~1,027 hits.
+- The worst case — everything on screen at once — went from 49 ms to
+  13.8 ms (**3.6x**) via draw-call batching and sub-pixel LOD.
 
 Measured on Intel(R) Xeon(R) Processor @ 2.10GHz (4 cores), headless Chromium 141
 with **software rasterisation** (`SwiftShader`), which makes these a lower bound —
@@ -95,26 +95,57 @@ counter; when to redraw stays the host's decision.
 
 ## Status
 
-M0 and M1 are done. The spatial index arrived early because the benchmark could
-not produce a meaningful number without it.
-
-- [x] **M0** — camera, Canvas2D renderer, pan/zoom gestures
+- [x] **M0** — camera, Canvas2D renderer, mouse/trackpad/touch gestures, inertia
 - [x] **M1** — uniform-grid spatial index, viewport culling, benchmark harness
 - [ ] **M2** — hit testing, selection, drag, marquee, snapping
 - [ ] **M3** — command stack, undo/redo, serialisation
 - [ ] **M4** — React bindings, and a whiteboard demo built on the public API
 - [ ] **M5** — CRDT collaboration (Yjs or Loro), as a separate package
 
+The spatial index arrived during M0 because the benchmark could not produce a
+meaningful number without it.
+
+Two caveats on what "done" means above:
+
+- **M1's target was 60 fps at 100k nodes, and p95 does not quite meet it** in
+  the two scenarios that pass through full zoom-out — 16.9 ms and 18.6 ms
+  against a 16.7 ms budget, on a software rasteriser. p50 clears it everywhere.
+  Dirty-rectangle rendering is the fix; see below.
+- **No keyboard shortcuts yet.** `Camera` has `zoomTo` and `fitToRect`, but
+  nothing binds zoom-to-fit or reset-to-100%.
+
 Known gaps, in rough priority order:
 
 - **Dirty-rectangle rendering.** Every frame is a full redraw today. Static
-  content on its own layer would make idle frames nearly free.
+  content on its own layer would make idle frames nearly free, and is what
+  closes the p95 gap above.
 - **R-tree.** A uniform grid degrades on content much denser or sparser than one
   item per cell. `UniformGrid` is behind an interface so it can be swapped.
 - **Sub-pixel LOD drops antialiasing and exact z-order.** Fine for a hundred
   thousand specks; wrong the moment two overlapping shapes must layer exactly.
 - **No WebGL renderer.** Deliberately — Canvas2D with culling and LOD gets
   further than people expect, and the `Renderer` interface keeps the door open.
+
+## Input
+
+`attachGestures` covers the three input families from one state machine: the
+centroid of the active pointers is what gets dragged, and their mean distance
+from it is the zoom. One pointer just has a constant spread, so a mouse drag and
+a two-finger pinch are the same code path instead of two that disagree at the
+edges.
+
+| input | behaviour |
+| --- | --- |
+| wheel / two-finger scroll | pan |
+| ctrl+wheel, trackpad pinch | zoom, anchored under the cursor |
+| middle-drag, space+left-drag | pan |
+| one finger | pan (set `singleTouch: 'ignore'` to leave it for selection) |
+| two fingers | pinch zoom and pan together |
+| flick | coasts to a stop; `inertia: false` turns it off |
+
+It takes over the element's `touch-action` on attach and restores it on detach,
+because the browser's native scrolling would otherwise swallow touch input
+before any handler sees it.
 
 ## Layout
 

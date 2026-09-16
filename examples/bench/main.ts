@@ -237,6 +237,12 @@ function runQueryBench(nodeCount: number, queries = 2000, seed = 1): QueryBenchR
 
 // --- interactive mode -------------------------------------------------------
 
+// The benchmark page is meant to be opened on a phone as often as a laptop,
+// so the hint has to describe the input the reader actually has.
+const HINT = matchMedia('(pointer: coarse)').matches
+  ? 'drag to pan · pinch to zoom · flick to glide'
+  : 'scroll to pan · ctrl+scroll or pinch to zoom · middle or space+drag to pan';
+
 let frameTimes: number[] = [];
 let lastFrame = 0;
 
@@ -255,7 +261,7 @@ function interactiveFrame(now: number): void {
     <div class="row"><span>render</span><b>${stats.durationMs.toFixed(2)} ms</b></div>
     <div class="row"><span>frame</span><b>${meanFrame.toFixed(2)} ms (${(1000 / (meanFrame || 1)).toFixed(0)} fps)</b></div>
     <div class="row"><span>zoom</span><b>${(camera.scale * 100).toFixed(1)}%</b></div>
-    <div class="hint">scroll to pan · ctrl/pinch to zoom · middle or space+drag to pan</div>`;
+    <div class="hint">${HINT}</div>`;
   requestAnimationFrame(interactiveFrame);
 }
 
@@ -273,6 +279,8 @@ declare global {
       ready: boolean;
       run(config: RunConfig): Promise<RunResult>;
       queryBench(nodeCount: number, queries?: number): QueryBenchResult;
+      /** Exposed so the harness can assert on camera state directly. */
+      camera: Camera;
     };
   }
 }
@@ -284,6 +292,7 @@ window.__BENCH__ = {
     return runScenario(config);
   },
   queryBench: (count, queries) => runQueryBench(count, queries),
+  camera,
 };
 
 if (!params.has('harness')) requestAnimationFrame(interactiveFrame);

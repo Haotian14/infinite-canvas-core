@@ -2,8 +2,25 @@
   "name": "infinite-canvas-core",
   "version": "0.0.0",
   "description": "Headless infinite-canvas engine: camera, culling, hit-testing and gestures, with pluggable renderers.",
-  "type": "module",
+  "keywords": [
+    "infinite-canvas",
+    "canvas",
+    "viewport",
+    "pan-zoom",
+    "whiteboard",
+    "headless"
+  ],
   "license": "MIT",
+  "author": "Haotian14",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Haotian14/infinite-canvas-core.git"
+  },
+  "homepage": "https://github.com/Haotian14/infinite-canvas-core#readme",
+  "bugs": {
+    "url": "https://github.com/Haotian14/infinite-canvas-core/issues"
+  },
+  "type": "module",
   "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,8 +31,12 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
@@ -25,14 +46,6 @@
     "bench": "node bench/run.mjs && node bench/update-readme.mjs",
     "bench:headed": "node bench/run.mjs --headed"
   },
-  "keywords": [
-    "infinite-canvas",
-    "canvas",
-    "viewport",
-    "pan-zoom",
-    "whiteboard",
-    "headless"
-  ],
   "devDependencies": {
     "playwright": "^1.63.0",
     "typescript": "^5.6.0",

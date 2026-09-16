@@ -68,12 +68,23 @@ export class Camera {
     return this.#version;
   }
 
-  /** Sets the viewport size in CSS pixels, keeping the centre point fixed. */
+  /**
+   * Sets the viewport size in CSS pixels.
+   *
+   * A later resize anchors on the centre, so growing or shrinking the window
+   * does not slide the content sideways. The *first* call is not a resize
+   * though — there is no content on screen to hold still — and anchoring it
+   * would leave a fresh camera translated by half a viewport, which is a
+   * surprising thing for `tx` to be.
+   */
   setViewport(width: number, height: number): this {
     if (width === this.#width && height === this.#height) return this;
-    // Anchor on the centre so a resize does not slide the content sideways.
-    this.#tx += (width - this.#width) / 2;
-    this.#ty += (height - this.#height) / 2;
+
+    const initialised = this.#width > 0 && this.#height > 0;
+    if (initialised) {
+      this.#tx += (width - this.#width) / 2;
+      this.#ty += (height - this.#height) / 2;
+    }
     this.#width = width;
     this.#height = height;
     return this.#touch();

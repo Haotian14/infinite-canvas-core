@@ -101,3 +101,11 @@ describe('Camera', () => {
     expect(camera.version).toBe(before + 1);
   });
 });
+
+describe('Camera.setViewport', () => {
+  it('leaves a fresh camera untranslated', () => {
+    const camera = new Camera().setViewport(800, 600);
+    expect(camera.toJSON()).toEqual({ scale: 1, tx: 0, ty: 0 });
+    expect(camera.screenToWorld({ x: 0, y: 0 })).toEqual({ x: 0, y: 0 });
+  });
+});

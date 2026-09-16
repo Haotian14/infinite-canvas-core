@@ -16,7 +16,7 @@ export type {
 export type { Renderer, RenderStats } from './renderer/types.js';
 
 export { attachGestures } from './input/gestures.js';
-export type { GestureHandle, GestureOptions } from './input/gestures.js';
+export type { GestureHandle, GestureOptions, InertiaOptions } from './input/gestures.js';
 
 export * as rect from './math/rect.js';
 export type { Matrix2D, Rect, Vec2 } from './types.js';
