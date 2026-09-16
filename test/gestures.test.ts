@@ -303,6 +303,15 @@ describe('inertia', () => {
 });
 
 describe('lifecycle', () => {
+  it('leaves the page scrollable when a single finger is ignored', () => {
+    // A full-page background canvas that took touch-action: none would make
+    // the document unscrollable everywhere it covers.
+    const handle = attach({ singleTouch: 'ignore' });
+    expect(element.style.touchAction).toBe('pan-x pan-y');
+    handle.detach();
+    expect(element.style.touchAction).toBe('auto');
+  });
+
   it('takes over touch-action and restores it on detach', () => {
     expect(element.style.touchAction).toBe('auto');
     const handle = attach();
@@ -323,5 +332,36 @@ describe('lifecycle', () => {
     handle.detach();
     expect(handle.isGliding).toBe(false);
     expect(clock.pendingCount()).toBe(0);
+  });
+});
+
+describe('wheel modes', () => {
+  it("leaves an unmodified wheel to the page in 'zoom-only'", () => {
+    let prevented = false;
+    attach({ wheel: 'zoom-only' });
+
+    element.dispatch('wheel', {
+      deltaX: 0, deltaY: 120, deltaMode: 0, clientX: 0, clientY: 0,
+      preventDefault: () => { prevented = true; },
+    });
+    expect(camera.toJSON()).toEqual({ scale: 1, tx: 0, ty: 0 });
+    expect(prevented).toBe(false);
+
+    // ctrl+wheel, and therefore a trackpad pinch, still zooms.
+    element.dispatch('wheel', {
+      deltaX: 0, deltaY: -120, deltaMode: 0, ctrlKey: true, clientX: 400, clientY: 300,
+      preventDefault: () => { prevented = true; },
+    });
+    expect(camera.scale).toBeGreaterThan(1);
+    expect(prevented).toBe(true);
+  });
+
+  it("attaches no wheel listener in 'none'", () => {
+    const before = element.listenerCount();
+    const handle = attach({ wheel: 'none' });
+    element.dispatch('wheel', { deltaX: 0, deltaY: 120, deltaMode: 0, clientX: 0, clientY: 0 });
+    expect(camera.toJSON()).toEqual({ scale: 1, tx: 0, ty: 0 });
+    handle.detach();
+    expect(element.listenerCount()).toBe(before);
   });
 });

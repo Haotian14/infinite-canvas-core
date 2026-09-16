@@ -122,7 +122,12 @@ export class Canvas2DRenderer<T extends ShapeNode = ShapeNode> implements Render
    * case neither allocates nor touches the pixel buffer.
    */
   private _splitByLod(nodes: readonly T[], camera: Camera): readonly T[] {
+    // Camera state is read once rather than through its getters inside the
+    // loop. Measured: no difference, V8 inlines them. Kept because the loop
+    // body is easier to read with the transform pre-multiplied.
     const scale = camera.scale;
+    const tx = camera.tx;
+    const ty = camera.ty;
     const threshold = this._lodMinScreenSize / scale;
 
     let firstSmall = -1;
@@ -137,22 +142,24 @@ export class Canvas2DRenderer<T extends ShapeNode = ShapeNode> implements Render
 
     const dpr = this._dpr;
     const big: T[] = nodes.slice(0, firstSmall);
-    this._lod.beginFrame();
+    const lod = this._lod;
+    lod.beginFrame();
+
+    const sx = scale * dpr;
+    const ox = tx * dpr;
+    const oy = ty * dpr;
 
     for (let i = firstSmall; i < nodes.length; i++) {
       const node = nodes[i] as T;
-      const { x, y, w, h } = node.rect;
-      if (w >= threshold || h >= threshold || node.fill === undefined) {
+      const rect = node.rect;
+      const w = rect.w;
+      const h = rect.h;
+      const fill = node.fill;
+      if (w >= threshold || h >= threshold || fill === undefined) {
         big.push(node);
         continue;
       }
-      this._lod.plot(
-        (x * scale + camera.tx) * dpr,
-        (y * scale + camera.ty) * dpr,
-        w * scale * dpr,
-        h * scale * dpr,
-        node.fill,
-      );
+      lod.plot(rect.x * sx + ox, rect.y * sx + oy, w * sx, h * sx, fill);
     }
     return big;
   }

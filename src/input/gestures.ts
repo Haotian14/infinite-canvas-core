@@ -20,6 +20,14 @@ export interface GestureOptions {
   /** Mouse buttons that start a pan drag. Default: middle only. */
   panButtons?: number[];
   /**
+   * What the wheel does. Default `'pan-and-zoom'`.
+   *
+   * `'zoom-only'` leaves an unmodified wheel to the page, so a canvas embedded
+   * in a scrolling document still scrolls it; ctrl+wheel and trackpad pinch
+   * still zoom. `'none'` ignores the wheel entirely.
+   */
+  wheel?: 'pan-and-zoom' | 'zoom-only' | 'none';
+  /**
    * What a single finger does. Default `'pan'`, which suits a viewer. An app
    * that puts selection or drawing on one finger should set `'ignore'` and
    * leave panning to two.
@@ -85,6 +93,7 @@ export function attachGestures(
 ): GestureHandle {
   const zoomSpeed = options.zoomSpeed ?? 0.01;
   const panButtons = options.panButtons ?? [1];
+  const wheelMode = options.wheel ?? 'pan-and-zoom';
   const singleTouch = options.singleTouch ?? 'pan';
   const notify = options.onChange ?? (() => {});
   const inertia: Required<InertiaOptions> | null =
@@ -214,6 +223,10 @@ export function attachGestures(
   // --- wheel ----------------------------------------------------------------
 
   const onWheel = (event: WheelEvent): void => {
+    // In zoom-only mode an unmodified wheel belongs to the page. Returning
+    // before preventDefault is what lets the document scroll normally.
+    if (wheelMode === 'zoom-only' && !event.ctrlKey) return;
+
     event.preventDefault();
     stopInertia();
 
@@ -314,11 +327,16 @@ export function attachGestures(
   };
 
   // The browser's own scrolling and pinch-zoom would otherwise swallow touch
-  // input before it ever reaches these handlers.
+  // input before it reaches these handlers. How much to take depends on what
+  // this instance actually wants: an element that ignores a single finger is
+  // usually embedded in a scrolling page, and taking 'none' there would leave
+  // the page unscrollable everywhere the element covers.
   const previousTouchAction = element.style?.touchAction ?? '';
-  if (element.style) element.style.touchAction = 'none';
+  if (element.style) {
+    element.style.touchAction = singleTouch === 'ignore' ? 'pan-x pan-y' : 'none';
+  }
 
-  element.addEventListener('wheel', onWheel, { passive: false });
+  if (wheelMode !== 'none') element.addEventListener('wheel', onWheel, { passive: false });
   element.addEventListener('pointerdown', onPointerDown);
   element.addEventListener('pointermove', onPointerMove);
   element.addEventListener('pointerup', endPointer);
