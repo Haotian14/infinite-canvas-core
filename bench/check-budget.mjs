@@ -13,12 +13,22 @@ import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Scenario at 100k nodes -> maximum acceptable median render time, in ms. */
+/**
+ * Scenario at 100k nodes -> maximum acceptable median render time, in ms.
+ *
+ * Sized for a shared two-core hosted runner, which is several times slower
+ * than a developer machine and noisier on top of that. They sit far above the
+ * numbers in the report on purpose: a budget tight enough to catch a 20%
+ * regression on this hardware would fail on noise instead, and a check people
+ * learn to ignore protects nothing. What these catch is the kind of mistake
+ * that matters — an accidental O(n) per frame, a lost index, a downlevelled
+ * hot path.
+ */
 const BUDGETS = {
-  'pan-close': 3,
-  'pan-mid': 8,
-  'zoom-cycle': 8,
-  overview: 45,
+  'pan-close': 5,
+  'pan-mid': 15,
+  'zoom-cycle': 15,
+  overview: 80,
 };
 
 /** Minimum acceptable speedup of an indexed viewport query over a full scan. */
