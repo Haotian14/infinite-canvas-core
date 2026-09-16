@@ -98,6 +98,12 @@ shows up only in a consumer's production build and never in dev. TypeScript's
 `private` gives the same encapsulation and compiles to a plain property, so
 there is nothing to downlevel. A test enforces it.
 
+**Writing a renderer is meant to be ordinary.** `Renderer` is three methods, and
+`LodBuffer` — the pixel buffer that makes sub-pixel shapes cheap — is exported
+for the purpose, because that is the part that is awkward to get right. The
+landing page's own renderer, which draws lit spheres instead of rectangles,
+lives in `site/renderer.ts` and required no change to `src/`.
+
 **The engine owns no render loop.** `Camera` and `Scene` expose a `version`
 counter; when to redraw stays the host's decision.
 
@@ -151,9 +157,24 @@ edges.
 | two fingers | pinch zoom and pan together |
 | flick | coasts to a stop; `inertia: false` turns it off |
 
-It takes over the element's `touch-action` on attach and restores it on detach,
-because the browser's native scrolling would otherwise swallow touch input
-before any handler sees it.
+### Embedding in a page that scrolls
+
+A canvas that fills the window inside a scrolling document has to give two
+things back, or the page around it stops working:
+
+```ts
+attachGestures(canvas, camera, {
+  wheel: 'zoom-only',    // an unmodified wheel stays with the document
+  singleTouch: 'ignore', // one finger scrolls the page; two work the canvas
+});
+```
+
+`attachGestures` takes over the element's `touch-action` on attach and restores
+it on detach, because the browser's own scrolling would otherwise swallow touch
+input before any handler saw it. How much it takes depends on `singleTouch`: a
+canvas that ignores a single finger gets `pan-x pan-y` rather than `none`, since
+taking `none` there would make the document unscrollable everywhere the element
+covers.
 
 ## Layout
 
@@ -168,6 +189,7 @@ src/
 bench/                 headless benchmark runner and profile tooling
 examples/basic         the smallest useful program
 examples/bench         100k-node playground, and the harness the runner drives
+site/                  the landing page, including a renderer of its own
 ```
 
 ## Development
