@@ -54,11 +54,11 @@ interface Entry<T> {
 export class UniformGrid<T> {
   readonly cellSize: number;
 
-  #cells = new Map<number, Array<Entry<T>>>();
-  #entries = new Map<T, Entry<T>>();
-  #oversized: Array<Entry<T>> = [];
-  #inverseCellSize: number;
-  #stamp = 0;
+  private _cells = new Map<number, Array<Entry<T>>>();
+  private _entries = new Map<T, Entry<T>>();
+  private _oversized: Array<Entry<T>> = [];
+  private _inverseCellSize: number;
+  private _stamp = 0;
 
   constructor(options: UniformGridOptions = {}) {
     const size = options.cellSize ?? 256;
@@ -66,15 +66,15 @@ export class UniformGrid<T> {
       throw new Error(`UniformGrid: cellSize must be a positive number, got ${size}`);
     }
     this.cellSize = size;
-    this.#inverseCellSize = 1 / size;
+    this._inverseCellSize = 1 / size;
   }
 
   get size(): number {
-    return this.#entries.size;
+    return this._entries.size;
   }
 
   insert(item: T, bounds: Rect): void {
-    const existing = this.#entries.get(item);
+    const existing = this._entries.get(item);
     if (existing !== undefined) {
       this.update(item, bounds);
       return;
@@ -88,21 +88,21 @@ export class UniformGrid<T> {
       stamp: -1,
       oversized: false,
     };
-    this.#entries.set(item, entry);
-    this.#link(entry);
+    this._entries.set(item, entry);
+    this._link(entry);
   }
 
   remove(item: T): boolean {
-    const entry = this.#entries.get(item);
+    const entry = this._entries.get(item);
     if (entry === undefined) return false;
-    this.#unlink(entry);
-    this.#entries.delete(item);
+    this._unlink(entry);
+    this._entries.delete(item);
     return true;
   }
 
   /** Re-indexes an item after its bounds changed. Cheap when the cells are unchanged. */
   update(item: T, bounds: Rect): void {
-    const entry = this.#entries.get(item);
+    const entry = this._entries.get(item);
     if (entry === undefined) {
       this.insert(item, bounds);
       return;
@@ -113,7 +113,7 @@ export class UniformGrid<T> {
     const maxX = bounds.x + bounds.w;
     const maxY = bounds.y + bounds.h;
 
-    if (this.#sameCells(entry, minX, minY, maxX, maxY)) {
+    if (this._sameCells(entry, minX, minY, maxX, maxY)) {
       entry.minX = minX;
       entry.minY = minY;
       entry.maxX = maxX;
@@ -121,18 +121,18 @@ export class UniformGrid<T> {
       return;
     }
 
-    this.#unlink(entry);
+    this._unlink(entry);
     entry.minX = minX;
     entry.minY = minY;
     entry.maxX = maxX;
     entry.maxY = maxY;
-    this.#link(entry);
+    this._link(entry);
   }
 
   clear(): void {
-    this.#cells.clear();
-    this.#entries.clear();
-    this.#oversized = [];
+    this._cells.clear();
+    this._entries.clear();
+    this._oversized = [];
   }
 
   /** Every indexed item whose bounds overlap `area`. Order is unspecified. */
@@ -145,10 +145,10 @@ export class UniformGrid<T> {
 
     // A fresh id per query makes dedup a single integer compare, with no set to
     // allocate and no per-candidate hash lookup.
-    const stamp = ++this.#stamp;
+    const stamp = ++this._stamp;
 
-    for (let i = 0; i < this.#oversized.length; i++) {
-      const entry = this.#oversized[i] as Entry<T>;
+    for (let i = 0; i < this._oversized.length; i++) {
+      const entry = this._oversized[i] as Entry<T>;
       entry.stamp = stamp;
       if (
         entry.minX <= queryMaxX &&
@@ -160,15 +160,15 @@ export class UniformGrid<T> {
       }
     }
 
-    const minCX = this.#cellIndex(queryMinX);
-    const minCY = this.#cellIndex(queryMinY);
-    const maxCX = this.#cellIndex(queryMaxX);
-    const maxCY = this.#cellIndex(queryMaxY);
+    const minCX = this._cellIndex(queryMinX);
+    const minCY = this._cellIndex(queryMinY);
+    const maxCX = this._cellIndex(queryMaxX);
+    const maxCY = this._cellIndex(queryMaxY);
 
     for (let cx = minCX; cx <= maxCX; cx++) {
       const column = (cx + BIAS) * STRIDE + BIAS;
       for (let cy = minCY; cy <= maxCY; cy++) {
-        const bucket = this.#cells.get(column + cy);
+        const bucket = this._cells.get(column + cy);
         if (bucket === undefined) continue;
         for (let i = 0; i < bucket.length; i++) {
           const entry = bucket[i] as Entry<T>;
@@ -189,15 +189,15 @@ export class UniformGrid<T> {
     return out;
   }
 
-  #link(entry: Entry<T>): void {
-    const minCX = this.#cellIndex(entry.minX);
-    const minCY = this.#cellIndex(entry.minY);
-    const maxCX = this.#cellIndex(entry.maxX);
-    const maxCY = this.#cellIndex(entry.maxY);
+  private _link(entry: Entry<T>): void {
+    const minCX = this._cellIndex(entry.minX);
+    const minCY = this._cellIndex(entry.minY);
+    const maxCX = this._cellIndex(entry.maxX);
+    const maxCY = this._cellIndex(entry.maxY);
 
     if ((maxCX - minCX + 1) * (maxCY - minCY + 1) > OVERSIZED_CELL_LIMIT) {
       entry.oversized = true;
-      this.#oversized.push(entry);
+      this._oversized.push(entry);
       return;
     }
     entry.oversized = false;
@@ -205,51 +205,51 @@ export class UniformGrid<T> {
       const column = (cx + BIAS) * STRIDE + BIAS;
       for (let cy = minCY; cy <= maxCY; cy++) {
         const key = column + cy;
-        const bucket = this.#cells.get(key);
-        if (bucket === undefined) this.#cells.set(key, [entry]);
+        const bucket = this._cells.get(key);
+        if (bucket === undefined) this._cells.set(key, [entry]);
         else bucket.push(entry);
       }
     }
   }
 
-  #unlink(entry: Entry<T>): void {
+  private _unlink(entry: Entry<T>): void {
     if (entry.oversized) {
-      const at = this.#oversized.indexOf(entry);
-      if (at !== -1) swapRemove(this.#oversized, at);
+      const at = this._oversized.indexOf(entry);
+      if (at !== -1) swapRemove(this._oversized, at);
       entry.oversized = false;
       return;
     }
 
-    const minCX = this.#cellIndex(entry.minX);
-    const minCY = this.#cellIndex(entry.minY);
-    const maxCX = this.#cellIndex(entry.maxX);
-    const maxCY = this.#cellIndex(entry.maxY);
+    const minCX = this._cellIndex(entry.minX);
+    const minCY = this._cellIndex(entry.minY);
+    const maxCX = this._cellIndex(entry.maxX);
+    const maxCY = this._cellIndex(entry.maxY);
 
     for (let cx = minCX; cx <= maxCX; cx++) {
       const column = (cx + BIAS) * STRIDE + BIAS;
       for (let cy = minCY; cy <= maxCY; cy++) {
         const key = column + cy;
-        const bucket = this.#cells.get(key);
+        const bucket = this._cells.get(key);
         if (bucket === undefined) continue;
         const at = bucket.indexOf(entry);
         if (at !== -1) swapRemove(bucket, at);
-        if (bucket.length === 0) this.#cells.delete(key);
+        if (bucket.length === 0) this._cells.delete(key);
       }
     }
   }
 
-  #sameCells(entry: Entry<T>, minX: number, minY: number, maxX: number, maxY: number): boolean {
+  private _sameCells(entry: Entry<T>, minX: number, minY: number, maxX: number, maxY: number): boolean {
     return (
-      this.#cellIndex(entry.minX) === this.#cellIndex(minX) &&
-      this.#cellIndex(entry.minY) === this.#cellIndex(minY) &&
-      this.#cellIndex(entry.maxX) === this.#cellIndex(maxX) &&
-      this.#cellIndex(entry.maxY) === this.#cellIndex(maxY)
+      this._cellIndex(entry.minX) === this._cellIndex(minX) &&
+      this._cellIndex(entry.minY) === this._cellIndex(minY) &&
+      this._cellIndex(entry.maxX) === this._cellIndex(maxX) &&
+      this._cellIndex(entry.maxY) === this._cellIndex(maxY)
     );
   }
 
-  #cellIndex(coordinate: number): number {
+  private _cellIndex(coordinate: number): number {
     if (!Number.isFinite(coordinate)) return coordinate > 0 ? MAX_CELL : -MAX_CELL;
-    const index = Math.floor(coordinate * this.#inverseCellSize);
+    const index = Math.floor(coordinate * this._inverseCellSize);
     return index < -MAX_CELL ? -MAX_CELL : index > MAX_CELL ? MAX_CELL : index;
   }
 }

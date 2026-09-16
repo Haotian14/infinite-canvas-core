@@ -24,12 +24,12 @@ export class Camera {
   readonly minScale: number;
   readonly maxScale: number;
 
-  #scale = 1;
-  #tx = 0;
-  #ty = 0;
-  #width = 0;
-  #height = 0;
-  #version = 0;
+  private _scale = 1;
+  private _tx = 0;
+  private _ty = 0;
+  private _width = 0;
+  private _height = 0;
+  private _version = 0;
 
   constructor(options: CameraOptions = {}) {
     this.minScale = options.minScale ?? 0.02;
@@ -37,27 +37,27 @@ export class Camera {
   }
 
   get scale(): number {
-    return this.#scale;
+    return this._scale;
   }
 
   /** Horizontal translation, in CSS pixels. */
   get tx(): number {
-    return this.#tx;
+    return this._tx;
   }
 
   /** Vertical translation, in CSS pixels. */
   get ty(): number {
-    return this.#ty;
+    return this._ty;
   }
 
   /** Viewport width in CSS pixels. */
   get width(): number {
-    return this.#width;
+    return this._width;
   }
 
   /** Viewport height in CSS pixels. */
   get height(): number {
-    return this.#height;
+    return this._height;
   }
 
   /**
@@ -65,7 +65,7 @@ export class Camera {
    * "did anything move since I last drew?" without diffing numbers.
    */
   get version(): number {
-    return this.#version;
+    return this._version;
   }
 
   /**
@@ -78,37 +78,37 @@ export class Camera {
    * surprising thing for `tx` to be.
    */
   setViewport(width: number, height: number): this {
-    if (width === this.#width && height === this.#height) return this;
+    if (width === this._width && height === this._height) return this;
 
-    const initialised = this.#width > 0 && this.#height > 0;
+    const initialised = this._width > 0 && this._height > 0;
     if (initialised) {
-      this.#tx += (width - this.#width) / 2;
-      this.#ty += (height - this.#height) / 2;
+      this._tx += (width - this._width) / 2;
+      this._ty += (height - this._height) / 2;
     }
-    this.#width = width;
-    this.#height = height;
-    return this.#touch();
+    this._width = width;
+    this._height = height;
+    return this._touch();
   }
 
   worldToScreen(p: Vec2): Vec2 {
-    return { x: p.x * this.#scale + this.#tx, y: p.y * this.#scale + this.#ty };
+    return { x: p.x * this._scale + this._tx, y: p.y * this._scale + this._ty };
   }
 
   screenToWorld(p: Vec2): Vec2 {
-    return { x: (p.x - this.#tx) / this.#scale, y: (p.y - this.#ty) / this.#scale };
+    return { x: (p.x - this._tx) / this._scale, y: (p.y - this._ty) / this._scale };
   }
 
   /** Converts a length, e.g. a hit tolerance of 4 screen px into world units. */
   screenToWorldDistance(d: number): number {
-    return d / this.#scale;
+    return d / this._scale;
   }
 
   /** Moves the view by a screen-space delta. Positive dx moves content right. */
   panBy(dx: number, dy: number): this {
     if (dx === 0 && dy === 0) return this;
-    this.#tx += dx;
-    this.#ty += dy;
-    return this.#touch();
+    this._tx += dx;
+    this._ty += dy;
+    return this._touch();
   }
 
   /**
@@ -116,28 +116,28 @@ export class Camera {
    * `anchor` (a screen-space point, default: viewport centre) pinned there.
    */
   zoomBy(factor: number, anchor?: Vec2): this {
-    return this.zoomTo(this.#scale * factor, anchor);
+    return this.zoomTo(this._scale * factor, anchor);
   }
 
   /** Sets an absolute zoom level, pinning the world point under `anchor`. */
   zoomTo(scale: number, anchor?: Vec2): this {
     const next = clamp(scale, this.minScale, this.maxScale);
-    if (next === this.#scale) return this;
+    if (next === this._scale) return this;
 
-    const a = anchor ?? { x: this.#width / 2, y: this.#height / 2 };
+    const a = anchor ?? { x: this._width / 2, y: this._height / 2 };
     const world = this.screenToWorld(a);
-    this.#scale = next;
+    this._scale = next;
     // Re-solve the translation so `world` lands back on `a`.
-    this.#tx = a.x - world.x * next;
-    this.#ty = a.y - world.y * next;
-    return this.#touch();
+    this._tx = a.x - world.x * next;
+    this._ty = a.y - world.y * next;
+    return this._touch();
   }
 
   /** Centres the viewport on a world point without changing zoom. */
   centerOn(p: Vec2): this {
-    this.#tx = this.#width / 2 - p.x * this.#scale;
-    this.#ty = this.#height / 2 - p.y * this.#scale;
-    return this.#touch();
+    this._tx = this._width / 2 - p.x * this._scale;
+    this._ty = this._height / 2 - p.y * this._scale;
+    return this._touch();
   }
 
   /**
@@ -145,17 +145,17 @@ export class Camera {
    * An empty rectangle (no content) is a no-op rather than a NaN camera.
    */
   fitToRect(target: Rect, padding = 32): this {
-    if (isEmptyRect(target) || this.#width <= 0 || this.#height <= 0) return this;
+    if (isEmptyRect(target) || this._width <= 0 || this._height <= 0) return this;
 
-    const availW = Math.max(1, this.#width - padding * 2);
-    const availH = Math.max(1, this.#height - padding * 2);
+    const availW = Math.max(1, this._width - padding * 2);
+    const availH = Math.max(1, this._height - padding * 2);
     // A zero-width or zero-height target (a single point, a flat line) would
     // divide to Infinity, so only constrain on the axes that have extent.
     const fitW = target.w > 0 ? availW / target.w : Infinity;
     const fitH = target.h > 0 ? availH / target.h : Infinity;
     const fit = Math.min(fitW, fitH);
 
-    this.#scale = clamp(Number.isFinite(fit) ? fit : this.#scale, this.minScale, this.maxScale);
+    this._scale = clamp(Number.isFinite(fit) ? fit : this._scale, this.minScale, this.maxScale);
     return this.centerOn(center(target));
   }
 
@@ -165,31 +165,31 @@ export class Camera {
     return {
       x: topLeft.x,
       y: topLeft.y,
-      w: this.#width / this.#scale,
-      h: this.#height / this.#scale,
+      w: this._width / this._scale,
+      h: this._height / this._scale,
     };
   }
 
   /** The transform in `ctx.setTransform` order, without device pixel ratio. */
   toMatrix(): Matrix2D {
-    return [this.#scale, 0, 0, this.#scale, this.#tx, this.#ty];
+    return [this._scale, 0, 0, this._scale, this._tx, this._ty];
   }
 
   /** Snapshot suitable for serialisation or undo. */
   toJSON(): { scale: number; tx: number; ty: number } {
-    return { scale: this.#scale, tx: this.#tx, ty: this.#ty };
+    return { scale: this._scale, tx: this._tx, ty: this._ty };
   }
 
   /** Restores a snapshot. Viewport size is not part of camera state. */
   setState(state: { scale: number; tx: number; ty: number }): this {
-    this.#scale = clamp(state.scale, this.minScale, this.maxScale);
-    this.#tx = state.tx;
-    this.#ty = state.ty;
-    return this.#touch();
+    this._scale = clamp(state.scale, this.minScale, this.maxScale);
+    this._tx = state.tx;
+    this._ty = state.ty;
+    return this._touch();
   }
 
-  #touch(): this {
-    this.#version++;
+  private _touch(): this {
+    this._version++;
     return this;
   }
 }

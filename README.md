@@ -16,16 +16,16 @@ plus draw calls. Median of 3 runs of 180 frames each.
 
 | scenario | nodes | drawn/frame | render p50 (ms) | p95 | run spread |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `pan-close` | 100,000 | 584 | **0.2** | 0.3 | ±0% |
-| `pan-mid` | 100,000 | 5,707 | **1.9** | 2.3 | ±16% |
-| `zoom-cycle` | 100,000 | 13,922 | **0.7** | 19.6 | ±14% |
-| `overview` | 100,000 | 97,619 | **13.8** | 17.5 | ±14% |
+| `pan-close` | 100,000 | 584 | **0.2** | 0.4 | ±50% |
+| `pan-mid` | 100,000 | 5,707 | **1.9** | 2.3 | ±11% |
+| `zoom-cycle` | 100,000 | 13,922 | **0.8** | 15.7 | ±14% |
+| `overview` | 100,000 | 97,619 | **13.8** | 15.1 | ±17% |
 | `pan-mid` | 10,000 | 580 | **0.2** | 0.3 | ±0% |
 
-- Viewport query over 100,000 nodes: **40 µs** indexed vs 589 µs for a full
-  scan (**15x**), returning ~1,027 hits.
-- The worst case — everything on screen at once — went from 49 ms to
-  13.8 ms (**3.6x**) via draw-call batching and sub-pixel LOD.
+- Viewport query over 100,000 nodes: **48 µs** indexed vs 604 µs for a full
+  scan (**13x**), returning ~1,027 hits.
+- The worst case — everything on screen at once — went from 44 ms to
+  13.8 ms (**3.2x**) via draw-call batching and sub-pixel LOD.
 
 Measured on Intel(R) Xeon(R) Processor @ 2.10GHz (4 cores), headless Chromium 141
 with **software rasterisation** (`SwiftShader`), which makes these a lower bound —
@@ -89,6 +89,14 @@ and every mutation invalidate an ancestor chain. Grouping, when it lands, is a
 **Hit testing is geometric, not colour-picked.** Rendering ids into an offscreen
 buffer and reading pixels back is easy to write and impossible to run headless —
 it would tie the engine to a canvas, which is the one thing this design avoids.
+
+**No `#private` class fields.** They cost a WeakMap lookup per access once a
+bundler downlevels them, and bundlers downlevel them by default — Vite's default
+target includes Safari 14, which predates the syntax. On this project's own
+landing page that turned an 11 ms frame into a 36 ms one, a 3.3x regression that
+shows up only in a consumer's production build and never in dev. TypeScript's
+`private` gives the same encapsulation and compiles to a plain property, so
+there is nothing to downlevel. A test enforces it.
 
 **The engine owns no render loop.** `Camera` and `Scene` expose a `version`
 counter; when to redraw stays the host's decision.

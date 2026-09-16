@@ -24,32 +24,32 @@ export interface SceneOptions {
  * keeps the store itself O(1) to mutate.
  */
 export class Scene<T extends SceneNode = SceneNode> {
-  #nodes = new Map<NodeId, T>();
-  #index: UniformGrid<T>;
-  #bounds: Rect | null = null;
-  #version = 0;
+  private _nodes = new Map<NodeId, T>();
+  private _index: UniformGrid<T>;
+  private _bounds: Rect | null = null;
+  private _version = 0;
 
   constructor(options: SceneOptions = {}) {
-    this.#index = new UniformGrid<T>(
+    this._index = new UniformGrid<T>(
       options.cellSize === undefined ? {} : { cellSize: options.cellSize },
     );
   }
 
   get size(): number {
-    return this.#nodes.size;
+    return this._nodes.size;
   }
 
   /** Bumped on every mutation, for renderers and caches to compare against. */
   get version(): number {
-    return this.#version;
+    return this._version;
   }
 
   add(node: T): this {
-    const existing = this.#nodes.get(node.id);
-    if (existing !== undefined && existing !== node) this.#index.remove(existing);
-    this.#nodes.set(node.id, node);
-    this.#index.insert(node, node.rect);
-    return this.#invalidate();
+    const existing = this._nodes.get(node.id);
+    if (existing !== undefined && existing !== node) this._index.remove(existing);
+    this._nodes.set(node.id, node);
+    this._index.insert(node, node.rect);
+    return this._invalidate();
   }
 
   addAll(nodes: Iterable<T>): this {
@@ -58,26 +58,26 @@ export class Scene<T extends SceneNode = SceneNode> {
   }
 
   remove(id: NodeId): boolean {
-    const node = this.#nodes.get(id);
+    const node = this._nodes.get(id);
     if (node === undefined) return false;
-    this.#index.remove(node);
-    this.#nodes.delete(id);
-    this.#invalidate();
+    this._index.remove(node);
+    this._nodes.delete(id);
+    this._invalidate();
     return true;
   }
 
   get(id: NodeId): T | undefined {
-    return this.#nodes.get(id);
+    return this._nodes.get(id);
   }
 
   clear(): this {
-    this.#nodes.clear();
-    this.#index.clear();
-    return this.#invalidate();
+    this._nodes.clear();
+    this._index.clear();
+    return this._invalidate();
   }
 
   all(): IterableIterator<T> {
-    return this.#nodes.values();
+    return this._nodes.values();
   }
 
   /**
@@ -87,17 +87,17 @@ export class Scene<T extends SceneNode = SceneNode> {
    * items vanishing when they scroll into view. Go through here instead.
    */
   setRect(id: NodeId, next: Rect): boolean {
-    const node = this.#nodes.get(id);
+    const node = this._nodes.get(id);
     if (node === undefined) return false;
     node.rect = next;
-    this.#index.update(node, next);
-    this.#invalidate();
+    this._index.update(node, next);
+    this._invalidate();
     return true;
   }
 
   /** Every node whose bounds overlap `area`. Order is unspecified. */
   query(area: Rect): T[] {
-    return this.#index.search(area);
+    return this._index.search(area);
   }
 
   /**
@@ -108,7 +108,7 @@ export class Scene<T extends SceneNode = SceneNode> {
    */
   queryLinear(area: Rect): T[] {
     const out: T[] = [];
-    for (const node of this.#nodes.values()) {
+    for (const node of this._nodes.values()) {
       if (intersects(node.rect, area)) out.push(node);
     }
     return out;
@@ -116,17 +116,17 @@ export class Scene<T extends SceneNode = SceneNode> {
 
   /** Union of every node's bounds. Empty when the scene is. */
   bounds(): Rect {
-    if (this.#bounds === null) {
+    if (this._bounds === null) {
       let acc = emptyRect();
-      for (const node of this.#nodes.values()) acc = union(acc, node.rect);
-      this.#bounds = acc;
+      for (const node of this._nodes.values()) acc = union(acc, node.rect);
+      this._bounds = acc;
     }
-    return this.#bounds;
+    return this._bounds;
   }
 
-  #invalidate(): this {
-    this.#bounds = null;
-    this.#version++;
+  private _invalidate(): this {
+    this._bounds = null;
+    this._version++;
     return this;
   }
 }
