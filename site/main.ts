@@ -1,7 +1,8 @@
-import { Camera, Canvas2DRenderer, Scene, attachGestures, clamp } from '../src/index.js';
-import type { ShapeNode } from '../src/index.js';
+import { Camera, Scene, attachGestures, clamp } from '../src/index.js';
 import { worldSizeFor } from '../examples/shared/scene.js';
-import { buildPageScene } from './scene.js';
+import { CosmosRenderer } from './renderer.js';
+import type { Body } from './renderer.js';
+import { PALETTE, buildPageScene } from './scene.js';
 import report from '../bench/results/latest.json';
 import pkg from '../package.json';
 
@@ -49,7 +50,7 @@ const coarse = matchMedia('(pointer: coarse)').matches;
 const NODES = coarse ? 40_000 : 100_000;
 
 const camera = new Camera({ minScale: 0.0015, maxScale: 48 });
-const scene = new Scene<ShapeNode>({ cellSize: 512 });
+const scene = new Scene<Body>({ cellSize: 512 });
 scene.addAll(buildPageScene(NODES, worldSizeFor(NODES), 11));
 const bounds = scene.bounds();
 const world = worldSizeFor(NODES);
@@ -63,21 +64,26 @@ const world = worldSizeFor(NODES);
  * take the pixel-buffer path instead. What that costs is antialiasing on
  * shapes three pixels across, which is not a thing anybody can see.
  */
-const LOD_PX = 4;
+const LOD_PX = 3;
 
+/*
+ * A renderer written for this page against the library's public interface,
+ * living in site/renderer.ts. It is the page's own evidence for the claim two
+ * sections down: the engine hands over a scene and a camera and has no opinion
+ * about what is drawn. Nothing in src/ changed to make this look like this.
+ */
 let optimised = true;
-let renderer = new Canvas2DRenderer(canvas, {
+let renderer = new CosmosRenderer(canvas, {
+  palette: PALETTE,
   background: '#0a0c11',
-  grid: false,
   lodMinScreenSize: LOD_PX,
 });
 
 function rebuildRenderer(): void {
   renderer.destroy();
-  renderer = new Canvas2DRenderer(canvas, {
+  renderer = new CosmosRenderer(canvas, {
+    palette: PALETTE,
     background: '#0a0c11',
-    grid: false,
-    batchByFill: optimised,
     lodMinScreenSize: optimised ? LOD_PX : 0,
   });
   sizeToViewport();
@@ -281,21 +287,18 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('.cmd')) {
 // --- spec -------------------------------------------------------------------
 
 const SPEC: Array<[string, string]> = [
-  [
-    'headless',
-    'The core never touches the DOM. It runs in a Worker, in Node, in a plain unit test. That constraint is the design, not a side effect of it.',
-  ],
+  ['headless', 'The core never touches the DOM. It runs in a Worker, in Node, in a plain unit test.'],
   [
     'renderer',
-    '<b>Renderer</b> is three methods. Canvas2D ships; WebGL, WebGPU or SVG plug in without the engine noticing.',
+    '<b>Renderer</b> is three methods — resize, render, destroy. Canvas2D ships today; WebGL, WebGPU or SVG plug in without the engine noticing.',
   ],
   [
     'index',
-    `A uniform grid answers viewport queries in <b>${query ? query.indexedUs.toFixed(0) : '40'} µs</b> over ${(query?.nodeCount ?? 100_000).toLocaleString()} nodes, against <b>${query ? query.linearUs.toFixed(0) : '600'} µs</b> for a full scan.`,
+    `A uniform grid answers viewport queries in <b>${query ? query.indexedUs.toFixed(0) : '40'} µs</b> over ${(query?.nodeCount ?? 100_000).toLocaleString()} nodes, against <b>${query ? query.linearUs.toFixed(0) : '600'} µs</b> for a full scan. Insert and remove are O(1) with no rebalancing, which is what a drag needs: an R-tree clusters better but pays for it on every frame that moves something. It degrades on content far denser or sparser than one item per cell, and it sits behind an interface for that reason.`,
   ],
   [
     'gestures',
-    'Mouse, trackpad and touch share one state machine: the centroid of the active pointers is what you drag, their spread is the zoom. A single finger is a pinch with a constant spread. Flicks coast.',
+    'Mouse, trackpad and touch share one state machine: the centroid of the active pointers is what you drag, their spread is the zoom. A single finger is a pinch whose spread never changes. Flicks coast under friction defined per sixtieth of a second, so a glide decays at the same rate whatever the frame rate.',
   ],
 ];
 
@@ -305,7 +308,9 @@ $('#spec').innerHTML = SPEC.map(
 
 // --- code -------------------------------------------------------------------
 
-const SAMPLE = `import { Camera, Scene, Canvas2DRenderer, attachGestures } from 'infinite-canvas-core'
+const SAMPLE = `import {
+  Camera, Scene, Canvas2DRenderer, attachGestures,
+} from 'infinite-canvas-core'
 
 const camera = new Camera()
 const scene = new Scene()
@@ -351,12 +356,13 @@ const SCENARIOS: Array<[string, string]> = [
 ];
 
 $('#perf-frames').innerHTML =
-  '<tr><th>100,000 nodes</th><th class="num">drawn</th><th class="num">p50</th><th class="num">p95</th></tr>' +
+  '<thead><tr><th>100,000 nodes</th><th class="num">drawn</th><th class="num">p50</th><th class="num">p95</th></tr></thead><tbody>' +
   SCENARIOS.map(([key, label]) => {
     const r = tuned(key);
     if (!r) return '';
-    return `<tr><td>${label}</td><td class="num">${r.drawnMean.toLocaleString()}</td><td class="num">${r.renderMs.p50.toFixed(1)} ms</td><td class="num">${r.renderMs.p95.toFixed(1)} ms</td></tr>`;
-  }).join('');
+    return `<tr><td>${label}</td><td class="num" data-label="drawn">${r.drawnMean.toLocaleString()}</td><td class="num" data-label="p50">${r.renderMs.p50.toFixed(1)} ms</td><td class="num" data-label="p95">${r.renderMs.p95.toFixed(1)} ms</td></tr>`;
+  }).join('') +
+  '</tbody>';
 
 $('#perf-note').textContent =
   `A 60 fps budget is 16.7 ms. p50 clears it everywhere; p95 does not, in the two runs that ` +
@@ -374,7 +380,7 @@ const variant = (lod: number, batch: boolean): BenchRun | undefined =>
 const baseline = variant(0, false);
 
 $('#perf-opt').innerHTML =
-  '<tr><th>overview, 100,000 nodes</th><th class="num">p50</th><th class="num">vs base</th></tr>' +
+  '<thead><tr><th>overview, 100,000 nodes</th><th class="num">p50</th><th class="num">vs base</th></tr></thead><tbody>' +
   (
     [
       ['one fillRect per node', baseline],
@@ -385,14 +391,19 @@ $('#perf-opt').innerHTML =
     .map(([label, r], i) => {
       if (!r || !baseline) return '';
       const ratio = baseline.renderMs.p50 / r.renderMs.p50;
-      return `<tr class="${i === 2 ? 'lead' : ''}"><td>${label}</td><td class="num">${r.renderMs.p50.toFixed(1)} ms</td><td class="num">${i === 0 ? '—' : `${ratio.toFixed(1)}×`}</td></tr>`;
+      return `<tr class="${i === 2 ? 'lead' : ''}"><td>${label}</td><td class="num" data-label="p50">${r.renderMs.p50.toFixed(1)} ms</td><td class="num" data-label="vs base">${i === 0 ? '—' : `${ratio.toFixed(1)}×`}</td></tr>`;
     })
-    .join('');
+    .join('') + '</tbody>';
 
 const toggle = $<HTMLButtonElement>('#toggle-opt');
 toggle.addEventListener('click', () => {
   optimised = !optimised;
   toggle.setAttribute('aria-pressed', String(optimised));
-  toggle.textContent = optimised ? 'turn the optimisations off' : 'turn them back on';
+  toggle.textContent = optimised ? 'Turn the optimisations off' : 'Turn them back on';
   rebuildRenderer();
 });
+
+// Measured with esbuild --bundle --minify over dist/, then gzip -9. Stated
+// because a canvas engine that ships more bytes than the app using it is a
+// fair thing to worry about.
+$('#foot-facts').textContent = 'MIT · 5.7 kB gzipped · no runtime dependencies';

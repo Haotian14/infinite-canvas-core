@@ -15,6 +15,11 @@ export type {
 } from './renderer/canvas2d.js';
 export type { Renderer, RenderStats } from './renderer/types.js';
 
+// Exported for anyone writing their own renderer: the sub-pixel pixel buffer
+// is the awkward part of making one fast, and there is no reason to make each
+// of them rediscover it.
+export { LodBuffer } from './renderer/lod-buffer.js';
+
 export { attachGestures } from './input/gestures.js';
 export type { GestureHandle, GestureOptions, InertiaOptions } from './input/gestures.js';
 

@@ -35,8 +35,8 @@
     <main id="top">
       <section class="band hero">
         <h1>
-          The hard parts of<br />
-          an <em>infinite canvas</em>.
+          The hard parts<br />
+          of an <em>infinite<br />canvas</em>.
         </h1>
         <p class="lede">
           Camera, spatial index, viewport culling, gestures. No renderer, no framework,
@@ -82,17 +82,22 @@
           JS-to-C++ crossing per node.
         </p>
         <table class="data" id="perf-opt"></table>
-        <p class="aside-note">
-          <button type="button" class="inline-toggle" id="toggle-opt" aria-pressed="true">
-            turn the optimisations off
+        <div class="try">
+          <button type="button" class="try-btn" id="toggle-opt" aria-pressed="true">
+            Turn the optimisations off
           </button>
-          and watch the readout.
-        </p>
+          <span class="try-note">on the canvas behind this page, and watch the readout move.</span>
+        </div>
       </section>
 
       <footer class="band foot">
-        <span>MIT</span>
-        <a class="ghost" href="https://github.com/Haotian14/infinite-canvas-core">Haotian14/infinite-canvas-core</a>
+        <span id="foot-facts"></span>
+        <span>
+          Built by
+          <a class="ghost" href="https://github.com/Haotian14">Haotian14</a>
+          ·
+          <a class="ghost" href="https://github.com/Haotian14/infinite-canvas-core">source</a>
+        </span>
       </footer>
     </main>
 

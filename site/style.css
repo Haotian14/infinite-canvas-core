@@ -41,7 +41,7 @@
   --ground: #0a0c11;
   --ink: #eef1f7;
   --ink-2: #98a0b4;
-  --ink-3: #626b80;
+  --ink-3: #828ca4;
   --rule: #1e2331;
   --rule-2: #2b3145;
   --slab: #0d1017;
@@ -61,10 +61,26 @@ body {
   color: var(--ink);
   font: 400 16px/1.7 Figtree, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
 }
 
 ::selection { background: #e8ebf2; color: #0a0c11; }
+
+:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 3px;
+}
+
+[hidden] { display: none !important; }
+
+@media (pointer: coarse) {
+  /* Everything interactive clears the 44px touch minimum, which matters more
+     than usual on a page whose subject is touch handling. */
+  .cmd, .ghost, .inline-toggle, .resync, .bar a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
 
 /* --- the ground ----------------------------------------------------------- */
 
@@ -91,7 +107,6 @@ body {
   z-index: 1;
   pointer-events: none;
   background:
-    linear-gradient(180deg, var(--ground) 0%, rgb(10 12 17 / 0.82) 42%, transparent 100%) top / 100% 116px no-repeat,
     linear-gradient(
       100deg,
       rgb(10 12 17 / 0.97) 0%,
@@ -122,13 +137,25 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  z-index: 3;
+  z-index: 5;
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 20px var(--gut);
   font: 500 12.5px/1 'JetBrains Mono', monospace;
   letter-spacing: -0.01em;
+}
+
+/* The plate, not the veil, is what keeps body copy from printing through the
+   bar: the veil is below the content and can only ever dim the canvas. */
+.bar::before {
+  content: '';
+  position: absolute;
+  /* Extends past the bar so a line of text does not sit half-occluded at its
+     lower edge. */
+  inset: 0 0 -38px;
+  z-index: -1;
+  background: linear-gradient(180deg, var(--ground) 0%, var(--ground) 52%, rgb(10 12 17 / 0) 100%);
 }
 
 .mark { color: var(--ink); text-decoration: none; }
@@ -151,14 +178,15 @@ body {
   position: fixed;
   right: var(--gut);
   bottom: 28px;
-  z-index: 3;
+  z-index: 5;
   font: 400 11.5px/1.75 'JetBrains Mono', monospace;
   color: var(--ink-2);
   border-left: 1px solid var(--rule-2);
-  padding-left: 12px;
+  padding: 10px 14px 10px 12px;
   min-width: 208px;
-  /* Belt and braces over a canvas that can put anything behind it. */
-  text-shadow: 0 0 6px rgb(10 12 17 / 0.9), 0 0 2px rgb(10 12 17);
+  /* A plate rather than a text-shadow. The canvas behind it is mid-luminance
+     blue as often as it is dark, and a shadow cannot win against that. */
+  background: rgb(10 12 17 / 0.9);
 }
 .readout .row { display: flex; justify-content: space-between; gap: 18px; }
 .readout .row span { color: var(--ink-3); }
@@ -177,8 +205,31 @@ body {
 .resync:hover { color: var(--ink); border-color: var(--ink); }
 
 @media (max-width: 900px) {
-  .readout { bottom: 14px; min-width: 0; font-size: 10.5px; }
-  .readout .row { gap: 12px; }
+  .readout {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+    padding: 9px var(--gut) calc(9px + env(safe-area-inset-bottom));
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+    background: var(--ground);
+    font-size: 10px;
+  }
+  .readout-rows { display: flex; flex: 1; justify-content: space-between; gap: 6px; }
+  .readout .row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    line-height: 1.35;
+  }
+  .readout .row span { font-size: 9px; letter-spacing: 0.03em; }
+  .resync { margin: 0; font-size: 9.5px; }
 }
 
 /* --- content -------------------------------------------------------------- */
@@ -187,6 +238,11 @@ main {
   position: relative;
   z-index: 2;
   padding-inline: var(--gut);
+}
+
+@media (max-width: 900px) {
+  /* Reserve the readout strip's height so nothing ends underneath it. */
+  main { padding-bottom: 64px; }
 }
 
 .band {
@@ -206,6 +262,7 @@ main {
 
 h1 {
   margin: 0;
+  max-width: 13ch;
   font: 400 clamp(46px, 9vw, 104px)/0.96 'Instrument Serif', Georgia, serif;
   letter-spacing: -0.015em;
 }
@@ -294,11 +351,15 @@ h1 em { font-style: italic; color: var(--ink); }
   color: #c8cfdf;
 }
 .slab code { white-space: pre; }
+/* Any residual horizontal scroll should look like scroll, not like a crop. */
+.slab {
+  mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent 100%);
+}
 
 .t-key { color: #a8b4d8; }
 .t-str { color: #7ee7c7; }
 .t-fn { color: #8fb6ff; }
-.t-com { color: #545c72; font-style: italic; }
+.t-com { color: #767f99; font-style: italic; }
 .t-num { color: #ffd36e; }
 
 .aside-note {
@@ -309,6 +370,29 @@ h1 em { font-style: italic; color: var(--ink); }
 }
 .aside-note.wide { margin-bottom: 22px; }
 .aside-note code { color: var(--ink-2); }
+
+.try {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 30px;
+}
+
+.try-btn {
+  background: none;
+  border: 1px solid var(--ink-3);
+  color: var(--ink);
+  padding: 13px 20px;
+  min-height: 44px;
+  font: 500 13px/1 'JetBrains Mono', monospace;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.try-btn:hover { border-color: var(--ink); }
+.try-btn[aria-pressed='false'] { border-color: var(--ink); color: var(--ink); }
+
+.try-note { font: 400 13px/1.6 'JetBrains Mono', monospace; color: var(--ink-3); }
 
 .inline-toggle {
   background: none;
@@ -326,6 +410,7 @@ h1 em { font-style: italic; color: var(--ink); }
 
 table.data {
   width: 100%;
+  margin-top: 32px;
   border-collapse: collapse;
   font: 400 13px/1 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
@@ -353,11 +438,42 @@ table.data tr.lead td { color: var(--ink); }
 
 .foot {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 16px;
+  gap: 10px 24px;
+  max-width: none;
   padding-block: 40px 56px;
   font: 400 12px/1 'JetBrains Mono', monospace;
   color: var(--ink-3);
+}
+
+@media (max-width: 560px) {
+  table.data thead { display: none; }
+  table.data tr {
+    display: block;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  table.data tr:last-child { border-bottom: 0; }
+  table.data td {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 3px 0;
+    border: 0;
+  }
+  table.data td:first-child {
+    color: var(--ink);
+    padding-bottom: 10px;
+    display: block;
+  }
+  table.data td[data-label]::before {
+    content: attr(data-label);
+    color: var(--ink-3);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

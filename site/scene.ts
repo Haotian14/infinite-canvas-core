@@ -1,83 +1,83 @@
-import type { ShapeNode } from '../src/index.js';
 import { mulberry32 } from '../examples/shared/scene.js';
+import type { Body } from './renderer.js';
 
 /**
- * The scene the landing page draws.
+ * The field the landing page draws.
  *
  * Deliberately not the benchmark's scene. That one is a jittered uniform grid,
  * because uniform density is what makes a spatial-index measurement fair — and
- * uniform density is exactly what looks like television static at any zoom.
+ * uniform density looks like television static at every zoom.
  *
- * This one clusters. Pulled back, the clusters read as structure instead of
- * noise; up close, the mix of sizes gives a composition. It also happens to be
- * cheaper: most shapes are small enough to fall to the sub-pixel path when the
- * view is wide, while the few large ones keep their edges.
+ * Here the mass distribution does the work: overwhelmingly specks, a minority
+ * of bodies, a handful large enough to read as lit. Pulled back, the clusters
+ * are the structure; up close, the large bodies are the composition. It is
+ * also what keeps the frame cheap, since almost everything falls to the
+ * renderer's pixel path until you are close enough for it to matter.
  *
- * The numbers in the tables still come from the benchmark. The readout in the
- * corner measures whatever is actually on screen, which is this.
+ * The tables still come from the benchmark. The readout measures this.
  */
-const PALETTE = ['#6ea8fe', '#7ee7c7', '#f7a5c0', '#ffd36e', '#b39ddb', '#8fd3f4'];
+export const PALETTE = [
+  '#cfe2ff', // stars
+  '#8fb8ff', // blue
+  '#7ee7c7', // cyan
+  '#ffd08a', // amber
+  '#f7a5c0', // rose
+  '#b39ddb', // violet
+] as const;
 
-/** Box–Muller, so clusters fall off smoothly instead of ending at a hard edge. */
+/** Box–Muller, so a cluster falls off instead of ending at a hard edge. */
 function gaussian(random: () => number): number {
   const u = Math.max(random(), 1e-9);
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
 }
 
-export function buildPageScene(count: number, extent: number, seed = 11): ShapeNode[] {
+export function buildPageScene(count: number, extent: number, seed = 11): Body[] {
   const random = mulberry32(seed);
-  const nodes: ShapeNode[] = new Array(count);
+  const nodes: Body[] = new Array(count);
 
-  const clusterCount = 54;
-  const clusters = Array.from({ length: clusterCount }, () => ({
+  const clusters = Array.from({ length: 46 }, () => ({
     x: random() * extent,
     y: random() * extent,
-    // A wide spread of radii is what stops the field looking like polka dots.
-    radius: extent * (0.018 + random() ** 2 * 0.07),
-    weight: 0.25 + random() ** 1.8 * 3,
-    hue: Math.floor(random() * PALETTE.length),
+    radius: extent * (0.02 + random() ** 2 * 0.075),
+    weight: 0.3 + random() ** 1.7 * 3,
+    // A cluster mostly shares a hue, the way a real one shares an age.
+    tint: 1 + Math.floor(random() * (PALETTE.length - 1)),
   }));
 
   const total = clusters.reduce((sum, c) => sum + c.weight, 0);
   let index = 0;
 
+  const place = (x: number, y: number, tint: number): void => {
+    const roll = random();
+    // Almost everything is a speck. The rare large bodies are what give a
+    // close view something to be composed around.
+    const size = roll > 0.988 ? 190 + random() * 330 : roll > 0.9 ? 40 + random() * 120 : 6 + random() ** 1.8 * 26;
+    const mass = size > 180 ? 1 : size > 40 ? 0.6 : 0;
+    // Square bounds: the renderer inscribes a disc, so anything else would
+    // hand it an ellipse.
+    nodes[index] = {
+      id: `n${index}`,
+      rect: { x, y, w: size, h: size },
+      tint: mass === 0 && random() > 0.45 ? 0 : tint,
+      mass,
+    };
+    index++;
+  };
+
   for (const cluster of clusters) {
-    // Nearly a third stay loose, so the gaps between clusters still have
-    // something in them at close zoom.
-    const share = Math.floor((count * 0.7 * cluster.weight) / total);
-    for (let i = 0; i < share && index < count; i++, index++) {
-      // The size range stays narrow. An earlier version let a few shapes run
-      // to several hundred units; zoomed in they filled a third of the screen
-      // with flat colour and read as misplaced page elements rather than as
-      // canvas content.
-      const big = random() > 0.97;
-      const size = big ? 130 + random() * 110 : 16 + random() ** 2.2 * 105;
-      nodes[index] = {
-        id: `n${index}`,
-        rect: {
-          x: cluster.x + gaussian(random) * cluster.radius,
-          y: cluster.y + gaussian(random) * cluster.radius,
-          w: size * (0.55 + random() * 0.9),
-          h: size * (0.55 + random() * 0.9),
-        },
-        // Mostly the cluster's hue, with enough strays to avoid flat blocks.
-        fill: PALETTE[random() > 0.78 ? Math.floor(random() * PALETTE.length) : cluster.hue] as string,
-      };
+    const share = Math.floor((count * 0.72 * cluster.weight) / total);
+    for (let i = 0; i < share && index < count; i++) {
+      place(
+        cluster.x + gaussian(random) * cluster.radius,
+        cluster.y + gaussian(random) * cluster.radius,
+        random() > 0.78 ? 1 + Math.floor(random() * (PALETTE.length - 1)) : cluster.tint,
+      );
     }
   }
 
-  for (; index < count; index++) {
-    const size = 16 + random() ** 2.2 * 95;
-    nodes[index] = {
-      id: `n${index}`,
-      rect: {
-        x: random() * extent,
-        y: random() * extent,
-        w: size * (0.55 + random() * 0.9),
-        h: size * (0.55 + random() * 0.9),
-      },
-      fill: PALETTE[Math.floor(random() * PALETTE.length)] as string,
-    };
+  // The rest are loose, so the space between clusters is not empty.
+  while (index < count) {
+    place(random() * extent, random() * extent, 1 + Math.floor(random() * (PALETTE.length - 1)));
   }
 
   return nodes;
