@@ -1,6 +1,6 @@
 {
   "name": "infinite-canvas-core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Headless infinite-canvas engine: camera, culling, hit-testing and gestures, with pluggable renderers.",
   "keywords": [
     "infinite-canvas",
