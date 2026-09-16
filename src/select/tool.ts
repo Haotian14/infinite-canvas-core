@@ -3,6 +3,8 @@ import type { NodeId, Scene, SceneNode } from '../scene.js';
 import type { Rect, Vec2 } from '../types.js';
 import { rectFromPoints } from '../math/rect.js';
 import { hitTest, hitTestRect } from './hit-test.js';
+import type { History } from '../history/history.js';
+import type { Patch } from '../history/patch.js';
 import type { Selection } from './selection.js';
 import { computeSnap } from './snap.js';
 import type { SnapGuide } from './snap.js';
@@ -32,6 +34,17 @@ export interface SelectToolOptions<T extends SceneNode> {
   snapDistance?: number;
   /** How far the pointer must move before a press becomes a drag. Default 3. */
   dragThreshold?: number;
+  /**
+   * Makes drags undoable.
+   *
+   * One step per gesture, committed on release. A drag moves nodes on every
+   * pointer event; recording each of those would fill the stack with frames of
+   * a single movement, so the scene is mutated directly while the pointer is
+   * down and the step goes in at the end.
+   */
+  history?: History<T>;
+  /** Label for the recorded step. Default `'move'`. */
+  historyLabel?: string;
 }
 
 export interface SelectTool {
@@ -198,6 +211,23 @@ export function attachSelectTool<T extends SceneNode>(options: SelectToolOptions
       if (element.hasPointerCapture(event.pointerId)) element.releasePointerCapture(event.pointerId);
     } catch {
       // Already released by the browser.
+    }
+
+    if (phase === 'dragging' && options.history !== undefined) {
+      const forward: Patch<T>[] = [];
+      const inverse: Patch<T>[] = [];
+      for (const [id, origin] of origins) {
+        const node = scene.get(id);
+        if (node === undefined) continue;
+        const { x, y, w, h } = node.rect;
+        // A drag that ended where it started is not a step.
+        if (x === origin.x && y === origin.y) continue;
+        forward.push({ op: 'move', id, rect: { x, y, w, h } });
+        inverse.push({ op: 'move', id, rect: origin });
+      }
+      if (forward.length > 0) {
+        options.history.record(options.historyLabel ?? 'move', forward, inverse);
+      }
     }
 
     // A press that never became a drag is a click. Only the deferred case is

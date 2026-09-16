@@ -115,6 +115,23 @@ export class Scene<T extends SceneNode = SceneNode> {
     return true;
   }
 
+  /**
+   * Puts a node at an explicit depth.
+   *
+   * Lower level than `bringToFront`, and here because undo has to restore the
+   * exact depth a node had rather than a new one on top. Values are not
+   * required to be unique; ties fall back to insertion order, which is what
+   * `zOrdered`'s stable sort gives.
+   */
+  setZ(id: NodeId, z: number): boolean {
+    if (!this._nodes.has(id)) return false;
+    this._z.set(id, z);
+    if (z > this._zTop) this._zTop = z;
+    if (z < this._zBottom) this._zBottom = z;
+    this._invalidate();
+    return true;
+  }
+
   /** Every node, back to front. Renderers that care about overlap want this. */
   zOrdered(): T[] {
     return [...this._nodes.values()].sort((a, b) => this.zOf(a.id) - this.zOf(b.id));

@@ -237,3 +237,53 @@ describe('lifecycle', () => {
     expect(element.listenerCount()).toBe(0);
   });
 });
+
+describe('history', () => {
+  it('records one step for a drag, not one per pointer event', async () => {
+    const { History } = await import('../src/history/history.js');
+    const history = new History(scene);
+    tool = attach({ history });
+
+    element.dispatch('pointerdown', { clientX: 20, clientY: 20 });
+    for (let x = 30; x <= 120; x += 10) element.dispatch('pointermove', { clientX: x, clientY: 20 });
+    element.dispatch('pointerup', { clientX: 120, clientY: 20 });
+
+    expect(history.depth).toBe(1);
+    expect(history.undoLabel).toBe('move');
+    expect(scene.get('a')?.rect.x).toBe(100);
+
+    history.undo();
+    expect(scene.get('a')?.rect.x).toBe(0);
+    history.redo();
+    expect(scene.get('a')?.rect.x).toBe(100);
+  });
+
+  it('records nothing for a click, or for a drag that ends where it began', async () => {
+    const { History } = await import('../src/history/history.js');
+    const history = new History(scene);
+    tool = attach({ history });
+
+    drag([20, 20], [20, 20]);
+    expect(history.depth).toBe(0);
+
+    element.dispatch('pointerdown', { clientX: 20, clientY: 20 });
+    element.dispatch('pointermove', { clientX: 60, clientY: 20 });
+    element.dispatch('pointermove', { clientX: 20, clientY: 20 });
+    element.dispatch('pointerup', { clientX: 20, clientY: 20 });
+    expect(history.depth).toBe(0);
+  });
+
+  it('records nothing for a cancelled drag', async () => {
+    const { History } = await import('../src/history/history.js');
+    const history = new History(scene);
+    tool = attach({ history });
+
+    element.dispatch('pointerdown', { clientX: 20, clientY: 20 });
+    element.dispatch('pointermove', { clientX: 120, clientY: 120 });
+    for (const h of keyHandlers) h({ key: 'Escape' });
+    element.dispatch('pointerup', { clientX: 120, clientY: 120 });
+
+    expect(history.depth).toBe(0);
+    expect(scene.get('a')?.rect).toEqual({ x: 0, y: 0, w: 40, h: 40 });
+  });
+});

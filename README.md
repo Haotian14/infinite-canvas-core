@@ -112,7 +112,7 @@ counter; when to redraw stays the host's decision.
 - [x] **M0** — camera, Canvas2D renderer, mouse/trackpad/touch gestures, inertia
 - [x] **M1** — uniform-grid spatial index, viewport culling, benchmark harness
 - [x] **M2** — hit testing, selection, drag, marquee, snapping
-- [ ] **M3** — command stack, undo/redo, serialisation
+- [x] **M3** — command stack, undo/redo, serialisation
 - [ ] **M4** — React bindings, and a whiteboard demo built on the public API
 - [ ] **M5** — CRDT collaboration (Yjs or Loro), as a separate package
 
@@ -185,6 +185,55 @@ take world distances, so the caller converts with
 `camera.screenToWorldDistance`. A tolerance that is constant in world units
 becomes unusable as you zoom out.
 
+## History and persistence
+
+Patches, not snapshots. A snapshot per undo step is unaffordable at the sizes
+this is built for — a hundred thousand nodes copied on every nudge — and a
+patch is also the shape a collaboration layer needs, so one representation
+carries both.
+
+```ts
+const history = new History(scene);
+
+// Applies the patches and records the step, inverses computed from the
+// scene as it was before.
+history.run('delete', ids.map((id) => ({ op: 'remove', id })));
+history.undo();
+```
+
+There are two ways in, because interactions come in two shapes. `run` applies
+and records, for changes that happen at once. `record` takes a change the
+caller has already made plus the patches that undo it — a drag moves nodes on
+every pointer event, and recording each of those would fill the stack with
+frames of one gesture, so `attachSelectTool` mutates live and commits a single
+step on release.
+
+```ts
+attachSelectTool({ element, scene, camera, selection, history });
+```
+
+`transact` groups several changes into one step and nests, so a routine that
+batches internally still merges into its caller's step.
+
+### Saving
+
+```ts
+localStorage.setItem('doc', JSON.stringify(serializeDocument(scene, camera)));
+deserializeInto(scene, JSON.parse(localStorage.getItem('doc')).scene);
+```
+
+Nodes are written back to front and carry no depth field: order **is** depth,
+so the format has one representation of it rather than two that can disagree.
+The spatial index is not written either — it is derived, and rebuilding it on
+load is faster than parsing it.
+
+`deserializeInto` loads into the scene you already have, and is usually what
+you want. Returning a fresh instance leaves every reference to the old one —
+renderer, tool, history — silently stale, and the symptom is an editor that
+looks loaded but is still driving the document you left behind. Validation runs
+before anything is cleared, so a bad snapshot throws and leaves the scene
+untouched.
+
 ## Input
 
 `attachGestures` covers the three input families from one state machine: the
@@ -251,10 +300,12 @@ src/
   input/gestures.ts    wheel/pinch/drag state machine
   input/keyboard.ts    zoom and pan shortcuts
   select/              hit testing, selection, snapping, the pointer tool
+  history/             patches, undo and redo
+  persist.ts           scene and document snapshots
   math/rect.ts         rectangle primitives
 bench/                 headless benchmark runner and profile tooling
 examples/basic         the smallest useful program
-examples/select        select, drag, marquee and snap, with the drawing half
+examples/select        select, drag, marquee, snap, undo and save/load
 examples/bench         100k-node playground, and the harness the runner drives
 site/                  the landing page, including a renderer of its own
 ```

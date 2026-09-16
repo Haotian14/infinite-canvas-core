@@ -33,5 +33,19 @@ export type { SnapGuide, SnapOptions, SnapResult } from './select/snap.js';
 export { attachSelectTool } from './select/tool.js';
 export type { SelectTool, SelectToolOptions } from './select/tool.js';
 
+export { History } from './history/history.js';
+export type { HistoryOptions, HistoryStep } from './history/history.js';
+export { applyPatch, applyPatches, invertPatch } from './history/patch.js';
+export type { Patch } from './history/patch.js';
+
+export {
+  serializeScene,
+  serializeDocument,
+  deserializeScene,
+  deserializeInto,
+  deserializeDocument,
+} from './persist.js';
+export type { DocumentSnapshot, SceneSnapshot } from './persist.js';
+
 export * as rect from './math/rect.js';
 export type { Matrix2D, Rect, Vec2 } from './types.js';

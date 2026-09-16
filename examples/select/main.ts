@@ -1,11 +1,14 @@
 import {
   Camera,
   Canvas2DRenderer,
+  History,
   Scene,
   Selection,
   attachGestures,
   attachKeyboard,
   attachSelectTool,
+  deserializeInto,
+  serializeScene,
 } from '../../src/index.js';
 import type { ShapeNode } from '../../src/index.js';
 import { mulberry32 } from '../shared/scene.js';
@@ -17,6 +20,7 @@ const camera = new Camera();
 const renderer = new Canvas2DRenderer(canvas);
 const scene = new Scene<ShapeNode>();
 const selection = new Selection();
+const history = new History(scene, { onChange: () => draw() });
 
 const palette = ['#6ea8fe', '#7ee7c7', '#f7a5c0', '#ffd36e', '#b39ddb'];
 const random = mulberry32(5);
@@ -53,8 +57,59 @@ const tool = attachSelectTool({
   scene,
   camera,
   selection,
+  history,
   onChange: () => draw(),
 });
+
+const STORE = 'infinite-canvas-core:example';
+
+window.addEventListener('keydown', (event) => {
+  const mod = event.metaKey || event.ctrlKey;
+
+  if (mod && event.code === 'KeyZ') {
+    event.preventDefault();
+    if (event.shiftKey) history.redo();
+    else history.undo();
+    return;
+  }
+
+  if (event.code === 'Delete' || event.code === 'Backspace') {
+    if (selection.size === 0) return;
+    event.preventDefault();
+    // Through the history, so it undoes as one step with the nodes restored
+    // at the depth they had.
+    history.run(
+      `delete ${selection.size}`,
+      selection.toArray().map((id) => ({ op: 'remove', id }) as const),
+    );
+    selection.clear();
+    draw();
+    return;
+  }
+
+  if (mod && event.code === 'KeyS') {
+    event.preventDefault();
+    const json = JSON.stringify(serializeScene(scene));
+    localStorage.setItem(STORE, json);
+    saved = `${(json.length / 1024).toFixed(1)} kB`;
+    draw();
+    return;
+  }
+
+  if (mod && event.code === 'KeyO') {
+    event.preventDefault();
+    const json = localStorage.getItem(STORE);
+    if (json === null) return;
+    // Loaded in place, so the renderer, the tool and the history all keep
+    // pointing at the same scene they were built against.
+    deserializeInto(scene, JSON.parse(json));
+    selection.prune(scene);
+    history.clear();
+    draw();
+  }
+});
+
+let saved = '';
 
 /**
  * The tool decides what is selected and where the marquee is; it draws nothing,
@@ -108,9 +163,12 @@ function draw(): void {
   }
 
   hint.innerHTML = `
-    <div>selected <b>${selection.size}</b> of ${scene.size}</div>
+    <div>selected <b>${selection.size}</b> of ${scene.size} · undo depth <b>${history.depth}</b>${
+      saved ? ` · saved <b>${saved}</b>` : ''
+    }</div>
     <div>click / shift-click · drag to move · drag empty space to marquee</div>
-    <div>alt bypasses snapping · esc cancels · shift+1 fit · shift+2 fit selection</div>`;
+    <div>alt bypasses snapping · esc cancels · shift+1 fit · shift+2 fit selection</div>
+    <div>cmd+z undo · cmd+shift+z redo · del removes · cmd+s save · cmd+o load</div>`;
 }
 
 // Exposed so the example can be driven from a test harness.
