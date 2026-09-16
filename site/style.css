@@ -37,50 +37,65 @@
  * comes out of the canvas itself, drawn by the engine being sold. The palette
  * is therefore not a taste decision that has to be defended.
  */
+/*
+ * No accent colour anywhere in the chrome. Every bit of colour on this page is
+ * drawn by the engine being sold, so the palette is not a taste decision.
+ */
 :root {
   --ground: #0a0c11;
+  --slab: #12161f;
+
   --ink: #eef1f7;
-  --ink-2: #98a0b4;
-  --ink-3: #828ca4;
-  --rule: #1e2331;
-  --rule-2: #2b3145;
-  --slab: #0d1017;
+  --ink-2: #98a0b4;   /* 7.5:1 — secondary prose */
+  --ink-3: #828ca4;   /* 5.8:1 — labels, smallest type */
+
+  --rule: #262c3c;    /* hairlines, decorative */
+  --edge: #5d6780;    /* 3.5:1 — anything WCAG counts as a component boundary */
+
+  /* One type scale. Everything on the page is a step on it. */
+  --t1: 11px;
+  --t2: 13px;
+  --t3: 15px;
+  --t4: 18px;
+  --t5: 22px;
+  --t6: 30px;
+  --t7: clamp(40px, 8.5vw, 96px);
+
+  /* One spacing scale. */
+  --s1: 8px;
+  --s2: 16px;
+  --s3: 24px;
+  --s4: 40px;
+  --s5: 64px;
+
   --col: 660px;
   --gut: clamp(20px, 6vw, 96px);
+  --sans: Figtree, system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --serif: 'Instrument Serif', Georgia, serif;
 }
 
 * { box-sizing: border-box; }
 
-html {
-  scroll-behavior: smooth;
-  background: var(--ground);
-}
+html { scroll-behavior: smooth; background: var(--ground); }
 
 body {
   margin: 0;
   color: var(--ink);
-  font: 400 16px/1.7 Figtree, system-ui, sans-serif;
+  font: 400 16px/1.7 var(--sans);
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection { background: #e8ebf2; color: #0a0c11; }
 
+/* 1px vanishes over a starfield. */
 :focus-visible {
-  outline: 1px solid var(--ink);
+  outline: 2px solid var(--ink);
   outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgb(10 12 17 / 0.9);
 }
 
 [hidden] { display: none !important; }
-
-@media (pointer: coarse) {
-  /* Everything interactive clears the 44px touch minimum, which matters more
-     than usual on a page whose subject is touch handling. */
-  .cmd, .ghost, .inline-toggle, .resync, .bar a {
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-  }
-}
 
 /* --- the ground ----------------------------------------------------------- */
 
@@ -96,10 +111,11 @@ body {
 #stage:active { cursor: grabbing; }
 
 /*
- * Text has to stay readable over a field of coloured shapes, but a flat wash
- * would kill the thing it sits on. The veil is opaque down the reading column
- * and clears entirely on the right, so the canvas is always legibly itself
- * somewhere on screen.
+ * Text has to stay readable over a field of lit bodies, but a flat wash would
+ * kill the thing it sits on. The veil is opaque down the reading column and
+ * clears on the right, so the canvas is visibly itself somewhere on screen.
+ * The falloff starts past the numeric columns of the tables, which are the
+ * most precise text here and were previously crossed by stars.
  */
 .veil {
   position: fixed;
@@ -110,23 +126,25 @@ body {
     linear-gradient(
       100deg,
       rgb(10 12 17 / 0.97) 0%,
-      rgb(10 12 17 / 0.94) 34%,
-      rgb(10 12 17 / 0.72) 52%,
-      rgb(10 12 17 / 0.3) 72%,
-      rgb(10 12 17 / 0.12) 100%
+      rgb(10 12 17 / 0.95) 48%,
+      rgb(10 12 17 / 0.86) 62%,
+      rgb(10 12 17 / 0.4) 80%,
+      rgb(10 12 17 / 0.14) 100%
     ),
     radial-gradient(120% 80% at 50% 120%, rgb(10 12 17 / 0.5), transparent 60%),
-    /* The instrument has to stay readable wherever the canvas happens to be
-       bright, so the corner it lives in dims with the environment rather than
-       the numbers getting a box of their own. */
-    radial-gradient(30% 24% at 100% 100%, rgb(10 12 17 / 0.96) 20%, rgb(10 12 17 / 0.7) 55%, transparent 78%);
+    radial-gradient(30% 24% at 100% 100%, rgb(10 12 17 / 0.94) 20%, rgb(10 12 17 / 0.7) 55%, transparent 78%);
 }
 
 @media (max-width: 900px) {
-  /* Nothing to the right to reveal, so the veil just has to be readable. */
+  /* Light enough that the field is still visibly a field; type is larger here
+     than on desktop, so it can afford the competition. */
   .veil {
-    background:
-      linear-gradient(180deg, rgb(10 12 17 / 0.94) 0%, rgb(10 12 17 / 0.88) 60%, rgb(10 12 17 / 0.94) 100%);
+    background: linear-gradient(
+      180deg,
+      rgb(10 12 17 / 0.86) 0%,
+      rgb(10 12 17 / 0.7) 50%,
+      rgb(10 12 17 / 0.88) 100%
+    );
   }
 }
 
@@ -141,68 +159,66 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 20px var(--gut);
-  font: 500 12.5px/1 'JetBrains Mono', monospace;
+  padding: var(--s3) var(--gut);
+  font: 500 var(--t2)/1 var(--mono);
   letter-spacing: -0.01em;
-}
-
-/* The plate, not the veil, is what keeps body copy from printing through the
-   bar: the veil is below the content and can only ever dim the canvas. */
-.bar::before {
-  content: '';
-  position: absolute;
-  /* Extends past the bar so a line of text does not sit half-occluded at its
-     lower edge. */
-  inset: 0 0 -38px;
-  z-index: -1;
-  background: linear-gradient(180deg, var(--ground) 0%, var(--ground) 52%, rgb(10 12 17 / 0) 100%);
+  /* A hard edge, not a long fade. A gradient plate leaves a band where a line
+     of body copy is permanently half-erased, which is worse than an edge. */
+  background: var(--ground);
+  border-bottom: 1px solid var(--rule);
 }
 
 .mark { color: var(--ink); text-decoration: none; }
 .ver { color: var(--ink-3); margin-right: auto; }
 
+/*
+ * Underline via text-decoration, not border-bottom: a 44px touch target with a
+ * bottom border leaves the rule floating twenty pixels under the words.
+ */
 .ghost {
   color: var(--ink-2);
-  text-decoration: none;
-  border-bottom: 1px solid var(--rule-2);
-  padding-bottom: 2px;
-  transition: color 0.15s, border-color 0.15s;
+  text-decoration: underline;
+  text-decoration-color: var(--edge);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  transition: color 0.15s, text-decoration-color 0.15s;
 }
-.ghost:hover { color: var(--ink); border-color: var(--ink); }
+.ghost:hover { color: var(--ink); text-decoration-color: var(--ink); }
 
 /*
- * The instrument, not a badge. It sits still while the page moves, so the
- * numbers change under your eye as you read — which is the entire claim.
+ * The instrument. It stays still while the page moves, so the numbers change
+ * under your eye as you read, which is the entire claim.
  */
 .readout {
   position: fixed;
   right: var(--gut);
-  bottom: 28px;
+  bottom: var(--s3);
   z-index: 5;
-  font: 400 11.5px/1.75 'JetBrains Mono', monospace;
+  font: 400 var(--t1)/1.8 var(--mono);
   color: var(--ink-2);
-  border-left: 1px solid var(--rule-2);
-  padding: 10px 14px 10px 12px;
-  min-width: 208px;
-  /* A plate rather than a text-shadow. The canvas behind it is mid-luminance
-     blue as often as it is dark, and a shadow cannot win against that. */
-  background: rgb(10 12 17 / 0.9);
+  border: 1px solid var(--rule);
+  background: rgb(10 12 17 / 0.92);
+  padding: 10px 14px;
+  min-width: 212px;
 }
 .readout .row { display: flex; justify-content: space-between; gap: 18px; }
 .readout .row span { color: var(--ink-3); }
 .readout .row b { font-weight: 400; color: var(--ink); font-variant-numeric: tabular-nums; }
 
-.resync {
-  margin-top: 8px;
+.readout-actions { display: flex; gap: 14px; margin-top: var(--s1); }
+
+.linkish {
   background: none;
   border: 0;
-  border-bottom: 1px solid var(--rule-2);
-  padding: 0 0 2px;
+  padding: 0;
   font: inherit;
   color: var(--ink-3);
   cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--edge);
+  text-underline-offset: 3px;
 }
-.resync:hover { color: var(--ink); border-color: var(--ink); }
+.linkish:hover { color: var(--ink); text-decoration-color: var(--ink); }
 
 @media (max-width: 900px) {
   .readout {
@@ -212,24 +228,19 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
+    gap: var(--s2);
     min-width: 0;
-    padding: 9px var(--gut) calc(9px + env(safe-area-inset-bottom));
-    border-left: 0;
+    padding: 10px var(--gut) calc(10px + env(safe-area-inset-bottom));
+    border: 0;
     border-top: 1px solid var(--rule);
     background: var(--ground);
-    font-size: 10px;
+    font-size: var(--t1);
   }
-  .readout-rows { display: flex; flex: 1; justify-content: space-between; gap: 6px; }
-  .readout .row {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0;
-    line-height: 1.35;
-  }
-  .readout .row span { font-size: 9px; letter-spacing: 0.03em; }
-  .resync { margin: 0; font-size: 9.5px; }
+  /* Three columns at a readable size beats five at nine pixels. */
+  .readout-rows { display: flex; flex: 1; gap: var(--s3); }
+  .readout .row { flex-direction: column; align-items: flex-start; gap: 0; line-height: 1.4; }
+  .readout .row.secondary { display: none; }
+  .readout-actions { margin: 0; }
 }
 
 /* --- content -------------------------------------------------------------- */
@@ -241,16 +252,34 @@ main {
 }
 
 @media (max-width: 900px) {
-  /* Reserve the readout strip's height so nothing ends underneath it. */
-  main { padding-bottom: 64px; }
+  main { padding-bottom: 76px; }
 }
 
+/*
+ * Rules run the full content width and the text sits in a column inside them.
+ * Rules that stop at the measure leave a page of lines ending in mid-air.
+ */
+/*
+ * Rules run the full content width and dissolve toward the right.
+ *
+ * A hairline that stops at the measure leaves a page of lines ending in
+ * mid-air; one that runs the whole way crosses the lit half of the canvas,
+ * where it is lighter than the ground and darker than the stars and simply
+ * disappears. Fading it out is the only version of this that looks decided.
+ */
 .band {
-  max-width: var(--col);
-  padding-block: clamp(64px, 12vh, 132px);
-  border-top: 1px solid var(--rule);
+  position: relative;
+  padding-block: clamp(var(--s5), 11vh, 124px);
 }
-.band:first-child { border-top: 0; }
+.band::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, var(--rule) 0%, var(--rule) 52%, transparent 100%);
+}
+.band > * { max-width: var(--col); }
+.band:first-child::before { display: none; }
 
 .hero {
   min-height: 100svh;
@@ -263,80 +292,114 @@ main {
 h1 {
   margin: 0;
   max-width: 13ch;
-  font: 400 clamp(46px, 9vw, 104px)/0.96 'Instrument Serif', Georgia, serif;
+  font: 400 var(--t7)/0.96 var(--serif);
   letter-spacing: -0.015em;
+  text-wrap: balance;
 }
-h1 em { font-style: italic; color: var(--ink); }
+h1 em { font-style: italic; }
 
 .lede {
-  margin: 30px 0 0;
+  margin: var(--s3) 0 0;
   max-width: 34em;
-  font-size: clamp(16.5px, 1.6vw, 19px);
+  font-size: var(--t4);
   color: var(--ink-2);
+  text-wrap: pretty;
 }
-.lede.small { font-size: 16px; }
+.lede.small { font-size: var(--t3); }
 
 .hint {
-  margin: 18px 0 0;
-  font: 400 12.5px/1.7 'JetBrains Mono', monospace;
+  margin: var(--s2) 0 0;
+  font-size: var(--t3);
   color: var(--ink-3);
-  max-width: 34em;
+  max-width: 40ch;
+  text-wrap: pretty;
 }
 
-.get { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 40px; }
+.get {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s2) var(--s3);
+  margin-top: var(--s4);
+  font-size: var(--t2);
+}
 
-/* The install line is the command itself, not a button pretending to be one. */
+/* The install line is the command, not a button pretending to be one. It hangs
+   its padding so the command itself starts on the column edge. */
 .cmd {
   display: inline-flex;
   align-items: baseline;
-  gap: 16px;
+  gap: var(--s2);
+  margin-left: -15px;
   background: none;
-  border: 1px solid var(--rule-2);
-  padding: 11px 15px;
-  font: 400 13px/1 'JetBrains Mono', monospace;
+  border: 1px solid var(--edge);
+  padding: 12px 15px;
+  font: 400 var(--t2)/1 var(--mono);
   color: var(--ink);
   cursor: pointer;
   transition: border-color 0.15s;
 }
-.cmd:hover { border-color: var(--ink-3); }
-.cmd em { font-style: normal; color: var(--ink-3); font-size: 11.5px; }
+.cmd:hover { border-color: var(--ink); }
+.cmd em { font-style: normal; color: var(--ink-3); }
 
 .kicker {
-  margin: 0 0 40px;
-  font: 500 12px/1 'JetBrains Mono', monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  margin: 0 0 var(--s3);
+  font: 400 var(--t6)/1.15 var(--serif);
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 .sub {
-  margin: 64px 0 14px;
-  font: 400 26px/1.2 'Instrument Serif', Georgia, serif;
+  margin: var(--s5) 0 var(--s2);
+  font: 400 var(--t5)/1.25 var(--serif);
   color: var(--ink);
 }
 
 /* --- the spec list -------------------------------------------------------- */
 
-.spec { margin: 0; }
+.spec { margin: 0; max-width: none; }
 .spec .item {
+  position: relative;
   display: grid;
-  grid-template-columns: 148px minmax(0, 1fr);
-  gap: 26px;
-  padding: 22px 0;
-  border-top: 1px solid var(--rule);
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: var(--s3);
+  padding: var(--s3) 0;
   align-items: baseline;
 }
-.spec .item:first-child { border-top: 0; padding-top: 0; }
+.spec .item::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, var(--rule) 0%, var(--rule) 46%, transparent 100%);
+}
+.spec .item:first-child { padding-top: 0; }
+.spec .item:first-child::before { display: none; }
 
 .spec dt {
-  font: 400 12.5px/1.6 'JetBrains Mono', monospace;
+  font: 400 var(--t2)/1.6 var(--mono);
   color: var(--ink);
+  margin-left: -1px;
 }
-.spec dd { margin: 0; color: var(--ink-2); font-size: 15.5px; line-height: 1.65; }
+.spec dd {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--ink-2);
+  font-size: var(--t3);
+  line-height: 1.7;
+  text-wrap: pretty;
+}
 .spec dd b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+.spec dd code { font: 400 0.92em var(--mono); color: var(--ink); }
 
 @media (max-width: 620px) {
-  .spec .item { grid-template-columns: 1fr; gap: 8px; }
+  .spec .item { grid-template-columns: 1fr; gap: var(--s1); }
+  /* The hanging indent needs a gutter to hang into; at this width it would
+     put the box against the edge of the screen. */
+  .cmd { margin-left: 0; }
+  /* The veil is lighter here and the bodies behind it brighter, so the
+     smallest prose moves up a step. */
+  .hint { color: var(--ink-2); }
 }
 
 /* --- code ----------------------------------------------------------------- */
@@ -345,85 +408,52 @@ h1 em { font-style: italic; color: var(--ink); }
   margin: 0;
   background: var(--slab);
   border: 1px solid var(--rule);
-  padding: 22px;
+  padding: var(--s3);
   overflow-x: auto;
-  font: 400 12.8px/1.85 'JetBrains Mono', monospace;
+  font: 400 var(--t2)/1.85 var(--mono);
   color: #c8cfdf;
 }
 .slab code { white-space: pre; }
-/* Any residual horizontal scroll should look like scroll, not like a crop. */
-.slab {
-  mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent 100%);
+/* Only when it actually scrolls, or the panel loses its right edge for nothing. */
+.slab.is-scrollable {
+  mask-image: linear-gradient(90deg, #000 calc(100% - 44px), transparent 100%);
 }
 
-.t-key { color: #a8b4d8; }
+/* Tokens drawn from the canvas palette, so the page keeps its one colour rule. */
+.t-key { color: #b39ddb; }
 .t-str { color: #7ee7c7; }
-.t-fn { color: #8fb6ff; }
+.t-fn { color: #8fb8ff; }
 .t-com { color: #767f99; font-style: italic; }
-.t-num { color: #ffd36e; }
+.t-num { color: #ffd08a; }
 
-.aside-note {
-  margin: 18px 0 0;
-  font: 400 13px/1.7 'JetBrains Mono', monospace;
+.note {
+  margin: var(--s3) 0 0;
+  font-size: var(--t3);
+  line-height: 1.7;
   color: var(--ink-3);
-  max-width: 44em;
+  max-width: 46em;
+  text-wrap: pretty;
 }
-.aside-note.wide { margin-bottom: 22px; }
-.aside-note code { color: var(--ink-2); }
-
-.try {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 16px;
-  margin-top: 30px;
-}
-
-.try-btn {
-  background: none;
-  border: 1px solid var(--ink-3);
-  color: var(--ink);
-  padding: 13px 20px;
-  min-height: 44px;
-  font: 500 13px/1 'JetBrains Mono', monospace;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-.try-btn:hover { border-color: var(--ink); }
-.try-btn[aria-pressed='false'] { border-color: var(--ink); color: var(--ink); }
-
-.try-note { font: 400 13px/1.6 'JetBrains Mono', monospace; color: var(--ink-3); }
-
-.inline-toggle {
-  background: none;
-  border: 0;
-  border-bottom: 1px solid var(--rule-2);
-  padding: 0 0 2px;
-  font: inherit;
-  color: var(--ink);
-  cursor: pointer;
-}
-.inline-toggle:hover { border-color: var(--ink); }
-.inline-toggle[aria-pressed='false'] { color: var(--ink-2); }
+.note code { font: 400 0.92em var(--mono); color: var(--ink-2); }
 
 /* --- data ----------------------------------------------------------------- */
 
 table.data {
   width: 100%;
-  margin-top: 32px;
+  margin-top: var(--s4);
   border-collapse: collapse;
-  font: 400 13px/1 'JetBrains Mono', monospace;
+  font: 400 var(--t2)/1 var(--mono);
   font-variant-numeric: tabular-nums;
 }
 table.data th {
   text-align: left;
   font-weight: 400;
-  font-size: 11px;
+  font-size: var(--t1);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--ink-3);
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--rule-2);
+  border-bottom: 1px solid var(--edge);
 }
 table.data td {
   padding: 14px 0;
@@ -433,49 +463,62 @@ table.data td {
 table.data td:first-child { color: var(--ink); }
 table.data tr:last-child td { border-bottom: 0; }
 table.data .num { text-align: right; }
-table.data th.num { text-align: right; }
 table.data tr.lead td { color: var(--ink); }
 
+.try {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+  margin-top: var(--s4);
+}
+
+.try-btn {
+  background: none;
+  border: 1px solid var(--rule);
+  color: var(--ink-2);
+  padding: 13px 18px;
+  min-height: 44px;
+  font: 400 var(--t2)/1 var(--mono);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.try-btn:hover { border-color: var(--edge); color: var(--ink); }
+
+.try-note { font-size: var(--t3); color: var(--ink-3); }
+
 .foot {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 10px 24px;
-  max-width: none;
-  padding-block: 40px 56px;
-  font: 400 12px/1 'JetBrains Mono', monospace;
+  gap: var(--s1) var(--s3);
+  padding-block: var(--s4) var(--s5);
+  font-size: var(--t2);
   color: var(--ink-3);
 }
+/* Constrained like every other band, so it clears the fixed readout. */
+.foot > * { max-width: var(--col); }
 
 @media (max-width: 560px) {
   table.data thead { display: none; }
-  table.data tr {
-    display: block;
-    padding: 16px 0;
-    border-bottom: 1px solid var(--rule);
-  }
+  table.data tr { display: block; padding: var(--s2) 0; border-bottom: 1px solid var(--rule); }
   table.data tr:last-child { border-bottom: 0; }
-  table.data td {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 3px 0;
-    border: 0;
-  }
-  table.data td:first-child {
-    color: var(--ink);
-    padding-bottom: 10px;
-    display: block;
-  }
+  table.data td { display: flex; justify-content: space-between; gap: var(--s2); padding: 3px 0; border: 0; }
+  table.data td:first-child { display: block; color: var(--ink); padding-bottom: var(--s1); }
   table.data td[data-label]::before {
     content: attr(data-label);
     color: var(--ink-3);
-    font-size: 11px;
+    font-size: var(--t1);
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
+  .slab { font-size: 11px; padding: var(--s2); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
+@media (pointer: coarse) {
+  /* Everything interactive clears 44px, which matters more than usual on a
+     page whose subject is touch handling. [hidden] still wins, above. */
+  .cmd, .try-btn { min-height: 44px; }
+  .ghost, .linkish { padding-block: 12px; display: inline-block; }
 }

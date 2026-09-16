@@ -47,7 +47,20 @@ $('#ver').textContent = `v${(pkg as { version: string }).version}`;
 
 const canvas = $<HTMLCanvasElement>('#stage');
 const coarse = matchMedia('(pointer: coarse)').matches;
-const NODES = coarse ? 40_000 : 100_000;
+
+/*
+ * The same hundred thousand on every device.
+ *
+ * An earlier version ran forty thousand on touch, which meant the instrument
+ * built to make the page's claim falsifiable was quietly showing a different
+ * number from the claim. Phones are slower; the readout says so, and that is
+ * the more useful demo.
+ */
+const NODES = 100_000;
+
+$('#hint').innerHTML = coarse
+  ? 'You are looking at it. Two fingers move the canvas, one scrolls the page.'
+  : 'You are looking at it. Drag the background, pinch&nbsp;to&nbsp;zoom, or just keep scrolling.';
 
 const camera = new Camera({ minScale: 0.0015, maxScale: 48 });
 const scene = new Scene<Body>({ cellSize: 512 });
@@ -120,22 +133,23 @@ function sizeToViewport(): void {
  * crosses it rather than parking in it.
  */
 function stops(): Array<[at: number, widthInWorldUnits: number]> {
-  // The path ends wide, not all the way out.
+  // The path ends wide, not all the way out. Framing the entire field puts
+  // ninety thousand bodies on screen at two or three pixels each and lands the
+  // frame around 20 ms; a readout showing half the budget spent, beside a
+  // table about frame budgets, argues against the page. The canvas shows what
+  // culling is for, and the table keeps the worst case.
   //
-  // Framing the entire scene is the wrong job for the live canvas: it puts
-  // ninety thousand shapes on screen at two to three pixels each, which is
-  // four times the pixel writes of the benchmark's smaller shapes and lands
-  // the frame around 20 ms. A readout showing 30 fps next to a table about
-  // frame budget argues against the page.
-  //
-  // So the canvas shows what culling is for — tens of thousands of nodes
-  // rejected, a few tens of thousands drawn, comfortably inside budget — and
-  // the table beside it reports the worst case, which is the benchmark's job.
+  // Widths are normalised by viewport shape. They are world units across, but
+  // what costs is world units of *area*, and a portrait phone showing the same
+  // width sees far more of the scene vertically than a landscape display does.
+  // Left unadjusted, the small screen drew twice what the large one did.
+  const aspect = camera.width / Math.max(1, camera.height);
+  const k = Math.sqrt(aspect / 1.6); // 1.6 is the shape these numbers were chosen on
   return [
-    [0, 5_200],
-    [0.35, 15_000],
-    [0.62, 42_000],
-    [1, 46_000],
+    [0, 5_200 * k],
+    [0.35, 15_000 * k],
+    [0.62, 42_000 * k],
+    [1, 46_000 * k],
   ];
 }
 
@@ -177,7 +191,7 @@ function scrollProgress(): number {
 
 let queued = false;
 function onScroll(): void {
-  if (!driving || queued) return;
+  if (frozen || !driving || queued) return;
   queued = true;
   requestAnimationFrame(() => {
     queued = false;
@@ -241,19 +255,58 @@ function tick(now: number): void {
   }
   last = now;
 
-  const frame = median(frameTimes);
-  rows.innerHTML = [
-    ['nodes', stats.total.toLocaleString()],
-    ['drawn', stats.drawn.toLocaleString()],
-    ['culled', stats.culled.toLocaleString()],
-    ['render p50', `${median(renderTimes).toFixed(2)} ms`],
-    ['frame', frame > 0 ? `${(1000 / frame).toFixed(0)} fps` : '—'],
-  ]
-    .map(([k, v]) => `<div class="row"><span>${k}</span><b>${v}</b></div>`)
+  // Frames per second was pinned at exactly 60 in every state, because
+  // requestAnimationFrame is capped there — a number that never moves reads as
+  // decoration. The share of the 16.7 ms budget actually moves, and it is what
+  // the tables below are about.
+  const render = median(renderTimes);
+  rows.innerHTML = (
+    [
+      ['nodes', stats.total.toLocaleString(), false],
+      ['drawn', stats.drawn.toLocaleString(), false],
+      ['culled', stats.culled.toLocaleString(), true],
+      ['render p50', `${render.toFixed(2)} ms`, false],
+      ['frame budget', `${((render / (1000 / 60)) * 100).toFixed(0)}%`, true],
+    ] as Array<[string, string, boolean]>
+  )
+    .map(
+      ([k, v, secondary]) =>
+        `<div class="row${secondary ? ' secondary' : ''}"><span>${k}</span><b>${v}</b></div>`,
+    )
     .join('');
 
   requestAnimationFrame(tick);
 }
+
+/*
+ * A hundred thousand objects parallaxing behind every line of text has no
+ * escape hatch unless one is built. Reduced-motion freezes the camera on load;
+ * everyone else gets a control, which is also the most confident piece of
+ * chrome here — you only offer to switch off a demo you are sure of.
+ */
+const stillness = matchMedia('(prefers-reduced-motion: reduce)');
+let frozen = stillness.matches;
+const freeze = $<HTMLButtonElement>('#freeze');
+
+function paintFreeze(): void {
+  freeze.textContent = frozen ? 'unfreeze' : 'freeze';
+  freeze.setAttribute('aria-pressed', String(frozen));
+}
+
+freeze.addEventListener('click', () => {
+  frozen = !frozen;
+  paintFreeze();
+  setRunning(!frozen && !document.hidden);
+  if (frozen) {
+    // One last frame, so the readout reflects what is on screen while stopped.
+    renderer.render(scene, camera);
+    return;
+  }
+  // Scrolling while frozen moved the page but not the camera. Catch up, or
+  // unfreezing leaves the view describing where the reader used to be.
+  if (driving) cameraForScroll(scrollProgress());
+});
+paintFreeze();
 
 function setRunning(next: boolean): void {
   if (next === running) return;
@@ -266,8 +319,9 @@ function setRunning(next: boolean): void {
 }
 
 // Redrawing a hundred thousand nodes for a tab nobody is looking at is rude.
-document.addEventListener('visibilitychange', () => setRunning(!document.hidden));
-setRunning(!document.hidden);
+document.addEventListener('visibilitychange', () => setRunning(!frozen && !document.hidden));
+setRunning(!frozen && !document.hidden);
+if (frozen) renderer.render(scene, camera);
 
 // --- copy -------------------------------------------------------------------
 
@@ -290,7 +344,7 @@ const SPEC: Array<[string, string]> = [
   ['headless', 'The core never touches the DOM. It runs in a Worker, in Node, in a plain unit test.'],
   [
     'renderer',
-    '<b>Renderer</b> is three methods — resize, render, destroy. Canvas2D ships today; WebGL, WebGPU or SVG plug in without the engine noticing.',
+    '<code>Renderer</code> is three methods — resize, render, destroy. Canvas2D ships today; WebGL, WebGPU or SVG plug in without the engine noticing.',
   ],
   [
     'index',
@@ -337,6 +391,14 @@ function highlight(src: string): string {
     .replace(/\b(\d+)\b/g, '<span class="t-num">$1</span>');
 }
 $('#sample').innerHTML = highlight(SAMPLE);
+
+// The fade only belongs there when the panel can actually be scrolled.
+const slab = $<HTMLElement>('.slab');
+const markScrollable = (): void => {
+  slab.classList.toggle('is-scrollable', slab.scrollWidth > slab.clientWidth + 1);
+};
+markScrollable();
+new ResizeObserver(markScrollable).observe(slab);
 
 // --- numbers ----------------------------------------------------------------
 

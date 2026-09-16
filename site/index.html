@@ -29,7 +29,10 @@
 
     <aside class="readout" id="readout" aria-live="off">
       <div class="readout-rows" id="readout-rows"></div>
-      <button type="button" class="resync" id="resync" hidden>resync to scroll</button>
+      <div class="readout-actions">
+        <button type="button" class="linkish" id="freeze">freeze</button>
+        <button type="button" class="linkish" id="resync" hidden>resync</button>
+      </div>
     </aside>
 
     <main id="top">
@@ -42,9 +45,7 @@
           Camera, spatial index, viewport culling, gestures. No renderer, no framework,
           and no DOM in the core — bring your own.
         </p>
-        <p class="hint">
-          You are looking at it. Drag the background, pinch to zoom, or just keep scrolling.
-        </p>
+        <p class="hint" id="hint"></p>
         <div class="get">
           <button type="button" class="cmd" data-copy="npm i infinite-canvas-core">
             <span>npm i infinite-canvas-core</span>
@@ -55,28 +56,28 @@
       </section>
 
       <section class="band">
-        <h2 class="kicker">Four things, done properly</h2>
+        <h2 class="kicker">What it does</h2>
         <dl class="spec" id="spec"></dl>
       </section>
 
       <section class="band">
         <h2 class="kicker">The whole surface</h2>
         <pre class="slab"><code id="sample"></code></pre>
-        <p class="aside-note">
-          That is the entire public API in one screen. <code>examples/basic</code> is this
-          program, complete.
+        <p class="note">
+          That is the entire public API in one screen, and
+          <code>examples/basic</code>&nbsp;is that program, complete.
         </p>
       </section>
 
       <section class="band" id="numbers">
         <h2 class="kicker">Measured, not claimed</h2>
-        <p class="lede small" id="perf-lede"></p>
+        <p class="note" id="perf-lede"></p>
 
         <table class="data" id="perf-frames"></table>
-        <p class="aside-note" id="perf-note"></p>
+        <p class="note" id="perf-note"></p>
 
         <h3 class="sub">Where the worst case went</h3>
-        <p class="aside-note wide">
+        <p class="note">
           Zoomed fully out, culling rejects nothing. The profile said the frame was not
           pixel-bound — <code>ctx.rect()</code> alone was about a third of it, one
           JS-to-C++ crossing per node.
@@ -86,17 +87,31 @@
           <button type="button" class="try-btn" id="toggle-opt" aria-pressed="true">
             Turn the optimisations off
           </button>
-          <span class="try-note">on the canvas behind this page, and watch the readout move.</span>
+          <span class="try-note">Watch the readout while you do.</span>
+        </div>
+      </section>
+
+      <section class="band">
+        <h2 class="kicker">Take it</h2>
+        <p class="lede small">
+          Version 0.1. Hit testing, selection and undo are not in it yet; the
+          roadmap in the readme says what is coming and in what order.
+        </p>
+        <div class="get">
+          <button type="button" class="cmd" data-copy="npm i infinite-canvas-core">
+            <span>npm i infinite-canvas-core</span>
+            <em>copy</em>
+          </button>
+          <a class="ghost" href="https://github.com/Haotian14/infinite-canvas-core#readme">Readme&#8202;&#8599;</a>
+          <a class="ghost" href="https://github.com/Haotian14/infinite-canvas-core/blob/main/bench/results/RESULTS.md">Benchmark&#8202;&#8599;</a>
         </div>
       </section>
 
       <footer class="band foot">
-        <span id="foot-facts"></span>
         <span>
-          Built by
-          <a class="ghost" href="https://github.com/Haotian14">Haotian14</a>
-          ·
-          <a class="ghost" href="https://github.com/Haotian14/infinite-canvas-core">source</a>
+          Built by <a class="ghost" href="https://github.com/Haotian14">Haotian14</a>
+          · <a class="ghost" href="https://github.com/Haotian14/infinite-canvas-core">source</a>
+          · <span id="foot-facts"></span>
         </span>
       </footer>
     </main>
