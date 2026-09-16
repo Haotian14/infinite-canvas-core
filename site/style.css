@@ -1,3 +1,25 @@
+/*
+ * Self-hosted rather than loaded from Google Fonts: one less render-blocking
+ * third-party request on first paint, no dependency on another origin staying
+ * up, and no visitor IP handed to a third party just to draw text. Both are
+ * variable fonts, latin subset only, 52 kB for the pair.
+ */
+@font-face {
+  font-family: Figtree;
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('./fonts/figtree.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url('./fonts/jetbrains-mono.woff2') format('woff2');
+}
+
 :root {
   --ink: #12141c;
   --ink-soft: #565d72;
@@ -37,13 +59,13 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font: 400 16px/1.65 Inter, system-ui, -apple-system, sans-serif;
+  font: 400 16px/1.65 Figtree, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3 {
-  font-family: Poppins, Inter, system-ui, sans-serif;
-  font-weight: 700;
+  font-family: Figtree, system-ui, sans-serif;
+  font-weight: 800;
   letter-spacing: -0.022em;
   line-height: 1.1;
   margin: 0;
@@ -188,7 +210,7 @@ h1 { font-size: clamp(38px, 7vw, 68px); }
 }
 .stat-strip dd {
   margin: 2px 0 0;
-  font-family: Poppins, sans-serif;
+  font-family: Figtree, sans-serif;
   font-weight: 700;
   font-size: 22px;
   letter-spacing: -0.02em;
@@ -239,7 +261,7 @@ h1 { font-size: clamp(38px, 7vw, 68px); }
   color: #9aa2bd;
   border-radius: 8px;
   padding: 5px 11px;
-  font: 500 12px Inter, sans-serif;
+  font: 500 12px Figtree, sans-serif;
   cursor: pointer;
 }
 .copy:hover { color: var(--code-ink); border-color: #434a66; }
@@ -290,7 +312,7 @@ h1 { font-size: clamp(38px, 7vw, 68px); }
   color: #cfd5e6;
   border-radius: 999px;
   padding: 7px 13px;
-  font: 500 12px Inter, sans-serif;
+  font: 500 12px Figtree, sans-serif;
   cursor: pointer;
 }
 .chip:hover { border-color: rgba(255, 255, 255, 0.3); color: #fff; }
