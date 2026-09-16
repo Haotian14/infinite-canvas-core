@@ -1,4 +1,4 @@
-import { Camera, Scene, attachGestures, clamp } from '../src/index.js';
+import { Camera, Scene, attachGestures, attachKeyboard, clamp } from '../src/index.js';
 import { worldSizeFor } from '../examples/shared/scene.js';
 import { CosmosRenderer } from './renderer.js';
 import type { Body } from './renderer.js';
@@ -228,6 +228,13 @@ attachGestures(canvas, camera, {
   onChange: takeOver,
 });
 canvas.addEventListener('pointerdown', takeOver);
+
+// A keyboard zoom is the reader taking the wheel just as a drag is, so it
+// stops scroll from driving until they ask for it back.
+attachKeyboard(camera, {
+  getContentBounds: () => scene.bounds(),
+  onChange: takeOver,
+});
 
 // --- the readout ------------------------------------------------------------
 

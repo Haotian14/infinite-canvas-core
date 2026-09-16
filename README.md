@@ -125,8 +125,9 @@ Two caveats on what "done" means above:
   the two scenarios that pass through full zoom-out — 16.9 ms and 18.6 ms
   against a 16.7 ms budget, on a software rasteriser. p50 clears it everywhere.
   Dirty-rectangle rendering is the fix; see below.
-- **No keyboard shortcuts yet.** `Camera` has `zoomTo` and `fitToRect`, but
-  nothing binds zoom-to-fit or reset-to-100%.
+- **The canvas element itself is not keyboard-focusable.** `attachKeyboard`
+  binds to the window, so zoom and pan work without focus, but there is no
+  roving focus over the content.
 
 Known gaps, in rough priority order:
 
@@ -157,6 +158,25 @@ edges.
 | two fingers | pinch zoom and pan together |
 | flick | coasts to a stop; `inertia: false` turns it off |
 
+### Keyboard
+
+`attachKeyboard` binds what a canvas is expected to have. It matches on
+`event.code` rather than `event.key`, because with shift held `1` arrives as
+`!` on a US layout and as something else elsewhere, and it stays out of the way
+while the user is typing in a field.
+
+```ts
+attachKeyboard(camera, { getContentBounds: () => scene.bounds() });
+```
+
+| keys | effect |
+| --- | --- |
+| `cmd`/`ctrl` + `0` | back to 100% |
+| `shift` + `1` | fit the content |
+| `shift` + `2` | fit the selection (needs `getSelectionBounds`) |
+| `+` / `-` | zoom about the viewport centre |
+| arrows | pan; hold `shift` for a tenth of a step |
+
 ### Embedding in a page that scrolls
 
 A canvas that fills the window inside a scrolling document has to give two
@@ -185,6 +205,7 @@ src/
   spatial/             uniform grid index
   renderer/            Renderer interface, Canvas2D backend, LOD pixel buffer
   input/gestures.ts    wheel/pinch/drag state machine
+  input/keyboard.ts    zoom and pan shortcuts
   math/rect.ts         rectangle primitives
 bench/                 headless benchmark runner and profile tooling
 examples/basic         the smallest useful program

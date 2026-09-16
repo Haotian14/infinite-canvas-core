@@ -1,4 +1,4 @@
-import { Camera, Canvas2DRenderer, Scene, attachGestures } from '../../src/index.js';
+import { Camera, Canvas2DRenderer, Scene, attachGestures, attachKeyboard } from '../../src/index.js';
 import type { ShapeNode } from '../../src/index.js';
 import { buildNodes, mulberry32, worldSizeFor } from '../shared/scene.js';
 
@@ -241,7 +241,7 @@ function runQueryBench(nodeCount: number, queries = 2000, seed = 1): QueryBenchR
 // so the hint has to describe the input the reader actually has.
 const HINT = matchMedia('(pointer: coarse)').matches
   ? 'drag to pan · pinch to zoom · flick to glide'
-  : 'scroll to pan · ctrl+scroll or pinch to zoom · middle or space+drag to pan';
+  : 'scroll to pan · ctrl+scroll to zoom · middle or space+drag to pan · shift+1 to fit · cmd+0 for 100%';
 
 let frameTimes: number[] = [];
 let lastFrame = 0;
@@ -270,6 +270,7 @@ resize();
 camera.fitToRect(scene.bounds(), 40);
 window.addEventListener('resize', resize);
 attachGestures(canvas, camera);
+attachKeyboard(camera, { getContentBounds: () => scene.bounds() });
 
 declare global {
   // eslint-disable-next-line no-var

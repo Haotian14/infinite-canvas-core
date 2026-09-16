@@ -21,6 +21,8 @@ export type { Renderer, RenderStats } from './renderer/types.js';
 export { LodBuffer } from './renderer/lod-buffer.js';
 
 export { attachGestures } from './input/gestures.js';
+export { attachKeyboard } from './input/keyboard.js';
+export type { KeyboardHandle, KeyboardOptions } from './input/keyboard.js';
 export type { GestureHandle, GestureOptions, InertiaOptions } from './input/gestures.js';
 
 export * as rect from './math/rect.js';

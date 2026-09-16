@@ -1,5 +1,5 @@
 // The whole library in one screen: a camera, a scene, a renderer, gestures.
-import { Camera, Canvas2DRenderer, Scene, attachGestures } from '../../src/index.js';
+import { Camera, Canvas2DRenderer, Scene, attachGestures, attachKeyboard } from '../../src/index.js';
 import type { ShapeNode } from '../../src/index.js';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -33,6 +33,8 @@ window.addEventListener('resize', resize);
 
 // The camera does not own a render loop, so redraws stay the host's decision.
 attachGestures(canvas, camera);
+// cmd+0 back to 100%, shift+1 to fit, +/- to zoom, arrows to pan.
+attachKeyboard(camera, { getContentBounds: () => scene.bounds() });
 
 let lastVersion = -1;
 function frame(): void {
