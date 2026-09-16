@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>infinite-canvas-core — select, drag, marquee</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0f1115; }
+      canvas { display: block; touch-action: none; cursor: default; }
+      #hint {
+        position: fixed; left: 12px; bottom: 12px; padding: 10px 12px;
+        background: rgba(12, 14, 20, 0.86); border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px; color: #cfd5e6; pointer-events: none;
+        font: 11.5px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      #hint b { color: #8fb0ff; font-weight: 500; }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <div id="hint"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

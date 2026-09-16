@@ -25,5 +25,13 @@ export { attachKeyboard } from './input/keyboard.js';
 export type { KeyboardHandle, KeyboardOptions } from './input/keyboard.js';
 export type { GestureHandle, GestureOptions, InertiaOptions } from './input/gestures.js';
 
+export { hitTest, hitTestAll, hitTestRect, ellipseContains } from './select/hit-test.js';
+export type { HitTestOptions, RectTestOptions } from './select/hit-test.js';
+export { Selection } from './select/selection.js';
+export { computeSnap } from './select/snap.js';
+export type { SnapGuide, SnapOptions, SnapResult } from './select/snap.js';
+export { attachSelectTool } from './select/tool.js';
+export type { SelectTool, SelectToolOptions } from './select/tool.js';
+
 export * as rect from './math/rect.js';
 export type { Matrix2D, Rect, Vec2 } from './types.js';

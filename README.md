@@ -111,7 +111,7 @@ counter; when to redraw stays the host's decision.
 
 - [x] **M0** — camera, Canvas2D renderer, mouse/trackpad/touch gestures, inertia
 - [x] **M1** — uniform-grid spatial index, viewport culling, benchmark harness
-- [ ] **M2** — hit testing, selection, drag, marquee, snapping
+- [x] **M2** — hit testing, selection, drag, marquee, snapping
 - [ ] **M3** — command stack, undo/redo, serialisation
 - [ ] **M4** — React bindings, and a whiteboard demo built on the public API
 - [ ] **M5** — CRDT collaboration (Yjs or Loro), as a separate package
@@ -140,6 +140,50 @@ Known gaps, in rough priority order:
   thousand specks; wrong the moment two overlapping shapes must layer exactly.
 - **No WebGL renderer.** Deliberately — Canvas2D with culling and LOD gets
   further than people expect, and the `Renderer` interface keeps the door open.
+
+## Selection
+
+The pieces are headless and usable on their own; `attachSelectTool` is the
+wiring, and it draws nothing. It reports a marquee rectangle and a set of
+alignment guides, and leaves rendering to the renderer — the only part that
+knows what anything looks like. `examples/select` is that other half.
+
+```ts
+const selection = new Selection();
+
+const tool = attachSelectTool({
+  element: canvas,
+  scene,
+  camera,
+  selection,
+  onChange: draw,
+  // Content that is not rectangular supplies its own test.
+  contains: ellipseContains,
+});
+```
+
+| | |
+| --- | --- |
+| click / shift-click | select, add, remove |
+| drag a node | move the whole selection |
+| drag empty space | marquee — enclosing when dragged right, touching when dragged left |
+| `alt` while dragging | bypass snapping |
+| `esc` | put the drag back, selection included |
+
+**Hit testing is geometric.** The index narrows the scene to the few nodes
+whose bounds could match, and only those pay for the precise test. Rendering
+ids into an offscreen buffer and reading pixels back is easy to write and
+impossible to run without a canvas, which would tie the engine to a renderer.
+
+**Snapping is measured from the drag's anchor, not accumulated per frame**, so
+a snap that takes on one frame and releases on the next leaves no permanent
+offset. Only what is on screen is considered: aligning to something a mile away
+is not a feature, and it would cost a pass over the whole scene every frame.
+
+**Thresholds are in world units.** `computeSnap` and the hit tolerance both
+take world distances, so the caller converts with
+`camera.screenToWorldDistance`. A tolerance that is constant in world units
+becomes unusable as you zoom out.
 
 ## Input
 
@@ -206,9 +250,11 @@ src/
   renderer/            Renderer interface, Canvas2D backend, LOD pixel buffer
   input/gestures.ts    wheel/pinch/drag state machine
   input/keyboard.ts    zoom and pan shortcuts
+  select/              hit testing, selection, snapping, the pointer tool
   math/rect.ts         rectangle primitives
 bench/                 headless benchmark runner and profile tooling
 examples/basic         the smallest useful program
+examples/select        select, drag, marquee and snap, with the drawing half
 examples/bench         100k-node playground, and the harness the runner drives
 site/                  the landing page, including a renderer of its own
 ```

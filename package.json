@@ -48,7 +48,8 @@
     "bench:headed": "node bench/run.mjs --headed",
     "site": "vite",
     "build:site": "vite build",
-    "preview:site": "vite preview"
+    "preview:site": "vite preview",
+    "select": "vite examples/select"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",

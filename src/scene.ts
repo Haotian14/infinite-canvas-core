@@ -25,6 +25,17 @@ export interface SceneOptions {
  */
 export class Scene<T extends SceneNode = SceneNode> {
   private _nodes = new Map<NodeId, T>();
+  /**
+   * Paint order, kept apart from the store.
+   *
+   * The Map iterates in insertion order, but a query goes through the grid and
+   * comes back in bucket order, so anything that needs to know which node is
+   * on top — hit testing, most of all — cannot read it off either. A counter
+   * per node is the smallest thing that survives both.
+   */
+  private _z = new Map<NodeId, number>();
+  private _zTop = 0;
+  private _zBottom = 0;
   private _index: UniformGrid<T>;
   private _bounds: Rect | null = null;
   private _version = 0;
@@ -47,6 +58,9 @@ export class Scene<T extends SceneNode = SceneNode> {
   add(node: T): this {
     const existing = this._nodes.get(node.id);
     if (existing !== undefined && existing !== node) this._index.remove(existing);
+    // Replacing a node keeps its place in the stack; only a new id gets a new
+    // one. Otherwise editing a node would quietly raise it above its peers.
+    if (!this._z.has(node.id)) this._z.set(node.id, ++this._zTop);
     this._nodes.set(node.id, node);
     this._index.insert(node, node.rect);
     return this._invalidate();
@@ -62,6 +76,7 @@ export class Scene<T extends SceneNode = SceneNode> {
     if (node === undefined) return false;
     this._index.remove(node);
     this._nodes.delete(id);
+    this._z.delete(id);
     this._invalidate();
     return true;
   }
@@ -73,7 +88,36 @@ export class Scene<T extends SceneNode = SceneNode> {
   clear(): this {
     this._nodes.clear();
     this._index.clear();
+    this._z.clear();
+    this._zTop = 0;
+    this._zBottom = 0;
     return this._invalidate();
+  }
+
+  /** Where a node sits in the stack. Larger is nearer the viewer. */
+  zOf(id: NodeId): number {
+    return this._z.get(id) ?? 0;
+  }
+
+  bringToFront(id: NodeId): boolean {
+    if (!this._nodes.has(id)) return false;
+    this._z.set(id, ++this._zTop);
+    this._invalidate();
+    return true;
+  }
+
+  sendToBack(id: NodeId): boolean {
+    if (!this._nodes.has(id)) return false;
+    // A separate descending counter, so sending one node back does not mean
+    // renumbering every other node in the scene.
+    this._z.set(id, --this._zBottom);
+    this._invalidate();
+    return true;
+  }
+
+  /** Every node, back to front. Renderers that care about overlap want this. */
+  zOrdered(): T[] {
+    return [...this._nodes.values()].sort((a, b) => this.zOf(a.id) - this.zOf(b.id));
   }
 
   all(): IterableIterator<T> {
