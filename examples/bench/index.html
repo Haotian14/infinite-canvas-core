@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>infinite-canvas-core — benchmark</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0f1115; }
+      body { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #e6e9ef; }
+      #canvas { display: block; touch-action: none; cursor: grab; }
+      #hud {
+        position: fixed; top: 12px; left: 12px; padding: 12px 14px;
+        background: rgba(14, 16, 22, 0.86); border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px; min-width: 240px; pointer-events: none;
+      }
+      #hud b { color: #6ea8fe; font-weight: 600; }
+      .row { display: flex; justify-content: space-between; gap: 16px; }
+      .hint { margin-top: 8px; color: #8b93a7; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <div id="hud">loading…</div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: node bench/run.mjs
+      # A hosted runner is shared and noisy, so this only catches order-of-
+      # magnitude regressions. The run spread in the report is the honest
+      # resolution limit; tighten the budget only on dedicated hardware.
+      - run: node bench/check-budget.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-results
+          path: bench/results/
