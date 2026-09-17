@@ -109,3 +109,29 @@ describe('Camera.setViewport', () => {
     expect(camera.screenToWorld({ x: 0, y: 0 })).toEqual({ x: 0, y: 0 });
   });
 });
+
+describe('Camera.worldToScreenRect', () => {
+  it('matches worldToScreen on both corners', () => {
+    const camera = new Camera().setViewport(800, 600).zoomTo(2).panBy(30, -15);
+    const box = { x: 12, y: -40, w: 100, h: 60 };
+    const screen = camera.worldToScreenRect(box);
+    const topLeft = camera.worldToScreen({ x: box.x, y: box.y });
+    const bottomRight = camera.worldToScreen({ x: box.x + box.w, y: box.y + box.h });
+
+    expect(screen.x).toBeCloseTo(topLeft.x, 9);
+    expect(screen.y).toBeCloseTo(topLeft.y, 9);
+    expect(screen.x + screen.w).toBeCloseTo(bottomRight.x, 9);
+    expect(screen.y + screen.h).toBeCloseTo(bottomRight.y, 9);
+  });
+
+  it('scales the size but never flips it', () => {
+    // Zoom before the viewport exists, so the scale is not anchored anywhere.
+    const camera = new Camera().zoomTo(0.25).setViewport(400, 400);
+    expect(camera.worldToScreenRect({ x: 0, y: 0, w: 80, h: 40 })).toEqual({
+      x: 0,
+      y: 0,
+      w: 20,
+      h: 10,
+    });
+  });
+});

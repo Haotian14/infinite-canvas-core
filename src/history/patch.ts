@@ -15,6 +15,11 @@ export type Patch<T extends SceneNode = SceneNode> =
   | { op: 'move'; id: NodeId; rect: Rect }
   | { op: 'order'; id: NodeId; z: number };
 
+/** Shallow, plus the one field the engine knows is mutable. */
+function copyNode<T extends SceneNode>(node: T): T {
+  return { ...node, rect: { ...node.rect } };
+}
+
 export function applyPatch<T extends SceneNode>(scene: Scene<T>, patch: Patch<T>): boolean {
   switch (patch.op) {
     case 'add':
@@ -50,14 +55,20 @@ export function invertPatch<T extends SceneNode>(
     case 'add': {
       const existing = scene.get(patch.node.id);
       // Adding over an existing id is a replacement, so undoing it restores
-      // the node that was there rather than removing anything.
+      // the node that was there rather than removing anything. That is also
+      // how a property changes - text, colour, anything the engine does not
+      // model - so the captured node is copied rather than referenced: a host
+      // that edits a node in place and re-adds it would otherwise hand us the
+      // object it is about to change and get an undo that restores nothing.
       return existing === undefined
         ? { op: 'remove', id: patch.node.id }
-        : { op: 'add', node: existing, z: scene.zOf(existing.id) };
+        : { op: 'add', node: copyNode(existing), z: scene.zOf(existing.id) };
     }
     case 'remove': {
       const existing = scene.get(patch.id);
-      return existing === undefined ? null : { op: 'add', node: existing, z: scene.zOf(patch.id) };
+      return existing === undefined
+        ? null
+        : { op: 'add', node: copyNode(existing), z: scene.zOf(patch.id) };
     }
     case 'move': {
       const existing = scene.get(patch.id);

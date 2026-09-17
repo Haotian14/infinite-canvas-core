@@ -162,6 +162,20 @@ export class Scene<T extends SceneNode = SceneNode> {
   }
 
   /**
+   * Every node overlapping `area`, back to front.
+   *
+   * {@link query} returns whatever order the index buckets hold, which is the
+   * right answer for culling — nothing in that result overlaps anything else
+   * in it — and the wrong one for painting, where overlap is the whole point.
+   * The sort is over the *visible* nodes rather than the scene, but it is
+   * still a sort, so it stays a separate method instead of a hidden cost on
+   * the hot path.
+   */
+  queryOrdered(area: Rect): T[] {
+    return this.query(area).sort((a, b) => this.zOf(a.id) - this.zOf(b.id));
+  }
+
+  /**
    * The same result as {@link query} by brute force.
    *
    * Kept as the benchmark's control and as the oracle the index is

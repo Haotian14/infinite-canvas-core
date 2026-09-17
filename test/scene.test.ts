@@ -62,3 +62,27 @@ describe('Scene', () => {
     expect(scene.bounds()).toEqual({ x: 0, y: 0, w: 10, h: 10 });
   });
 });
+
+describe('Scene.queryOrdered', () => {
+  it('returns the same nodes as query, back to front', () => {
+    const scene = new Scene({ cellSize: 16 });
+    // Added in an order the index will not preserve: the grid returns nodes
+    // bucket by bucket, which has nothing to do with paint order.
+    scene.addAll([node('a', 0, 0, 40, 40), node('b', 60, 0, 40, 40), node('c', 20, 0, 40, 40)]);
+    scene.bringToFront('a');
+    scene.sendToBack('c');
+
+    const area = { x: -10, y: -10, w: 200, h: 100 };
+    const ordered = scene.queryOrdered(area);
+    expect(ordered.map((n) => n.id)).toEqual(['c', 'b', 'a']);
+    expect(ordered.map((n) => n.id).sort()).toEqual(
+      scene.query(area).map((n) => n.id).sort(),
+    );
+  });
+
+  it('is still culled', () => {
+    const scene = new Scene({ cellSize: 16 });
+    scene.addAll([node('near', 0, 0, 10, 10), node('far', 5000, 5000, 10, 10)]);
+    expect(scene.queryOrdered({ x: -5, y: -5, w: 50, h: 50 }).map((n) => n.id)).toEqual(['near']);
+  });
+});

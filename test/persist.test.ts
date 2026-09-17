@@ -3,6 +3,7 @@ import { Camera } from '../src/camera.js';
 import { Scene } from '../src/scene.js';
 import {
   deserializeDocument,
+  deserializeDocumentInto,
   deserializeScene,
   serializeDocument,
   serializeScene,
@@ -118,5 +119,51 @@ describe('deserializeInto', () => {
     // Validation runs before anything is cleared.
     expect(live.size).toBe(3);
     expect(live.get('a')).toBeDefined();
+  });
+});
+
+describe('deserializeDocumentInto', () => {
+  it('loads into the scene and camera the caller already holds', () => {
+    const source = new Scene();
+    source.addAll([
+      { id: 'a', rect: { x: 0, y: 0, w: 10, h: 10 } },
+      { id: 'b', rect: { x: 50, y: 20, w: 30, h: 30 } },
+    ]);
+    const sourceCamera = new Camera().setViewport(800, 600).zoomTo(2).panBy(40, 12);
+    const snapshot = serializeDocument(source, sourceCamera);
+
+    const scene = new Scene({ cellSize: 64 });
+    scene.add({ id: 'stale', rect: { x: 0, y: 0, w: 1, h: 1 } });
+    const camera = new Camera().setViewport(800, 600);
+
+    deserializeDocumentInto({ scene, camera }, snapshot);
+
+    // Same objects, new contents. This is the whole point: a hook or a
+    // renderer holding either of these is still holding the live one.
+    expect(scene.size).toBe(2);
+    expect(scene.get('stale')).toBeUndefined();
+    expect(camera.toJSON()).toEqual(sourceCamera.toJSON());
+    // The index came back with the nodes.
+    const area = scene.bounds();
+    expect(scene.query(area)).toHaveLength(scene.queryLinear(area).length);
+  });
+
+  it('leaves the camera alone when the snapshot has none', () => {
+    const scene = new Scene();
+    const camera = new Camera().setViewport(800, 600).zoomTo(3);
+    const before = camera.toJSON();
+
+    deserializeDocumentInto({ scene, camera }, serializeDocument(new Scene()));
+    expect(camera.toJSON()).toEqual(before);
+  });
+
+  it('refuses anything that is not a version 1 document', () => {
+    const scene = new Scene();
+    scene.add({ id: 'a', rect: { x: 0, y: 0, w: 1, h: 1 } });
+    expect(() =>
+      deserializeDocumentInto({ scene }, { v: 2, scene: { v: 1, nodes: [] } } as never),
+    ).toThrow(TypeError);
+    // And left the scene as it was.
+    expect(scene.size).toBe(1);
   });
 });

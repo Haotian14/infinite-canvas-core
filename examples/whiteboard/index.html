@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>infinite-canvas-core — whiteboard (React)</title>
+    <style>
+      :root {
+        --ink: #151a24;
+        --ink-2: #5a6377;
+        --line: #d9dce3;
+        --plate: #ffffff;
+        --accent: #2f6bff;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body, #root { margin: 0; height: 100%; }
+      body { overflow: hidden; background: #f2f3f5; color: var(--ink); }
+
+      .board { position: fixed; inset: 0; }
+      .board canvas { touch-action: none; }
+
+      .bar, .readout {
+        position: fixed; left: 0; right: 0; z-index: 5;
+        display: flex; align-items: center; gap: 6px;
+        padding: 8px 12px; background: var(--plate);
+        font-size: 12.5px;
+      }
+      .bar { top: 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+      .readout {
+        bottom: 0; border-top: 1px solid var(--line); gap: 18px;
+        color: var(--ink-2); font-variant-numeric: tabular-nums;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px;
+      }
+      .bar strong { font-weight: 600; letter-spacing: -0.01em; }
+      .bar .sep { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }
+
+      .bar button {
+        font: inherit; color: var(--ink); background: var(--plate);
+        border: 1px solid var(--line); border-radius: 6px;
+        padding: 5px 10px; cursor: pointer; min-height: 30px;
+      }
+      .bar button:hover:not(:disabled) { border-color: #b6bcc9; }
+      .bar button:disabled { color: #a6adbb; cursor: default; }
+      .bar button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .bar button:focus-visible, .editor:focus-visible {
+        outline: 2px solid var(--accent); outline-offset: 1px;
+      }
+
+      .editor {
+        position: absolute; z-index: 4; margin: 0; resize: none;
+        border: 1.5px solid var(--accent); border-radius: 8px;
+        background: rgba(255, 255, 255, 0.94); color: var(--ink);
+        font-family: inherit; overflow: hidden;
+      }
+      .editor:focus { outline-offset: 0; }
+
+      /* A toolbar of words costs three rows on a phone, which is a third of
+         the screen given to chrome. Tighten it rather than hide the tools. */
+      @media (max-width: 640px) {
+        .bar { gap: 4px; padding: 6px 8px; font-size: 12px; }
+        .bar button { padding: 4px 8px; }
+        .bar .sep { margin: 0; }
+        .readout { gap: 12px; font-size: 11px; }
+        .readout .wide { display: none; }
+      }
+      @media (max-width: 420px) {
+        .bar strong, .bar .sep:first-of-type { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

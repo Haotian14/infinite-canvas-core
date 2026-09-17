@@ -184,3 +184,45 @@ describe('History', () => {
     expect(calls).toBe(4);
   });
 });
+
+describe('an undo record and the objects it came from', () => {
+  it('does not alias a node the host still holds', () => {
+    const scene = new Scene({ cellSize: 32 });
+    const node = at('a', 10, 20);
+    scene.add(node);
+    const history = new History(scene);
+
+    history.run('cut', [{ op: 'remove', id: 'a' }]);
+    // The host kept the object it deleted and reused it - for a paste
+    // elsewhere, or out of a pool. The undo record must already have its own.
+    node.rect = { x: 999, y: 999, w: 1, h: 1 };
+
+    history.undo();
+    expect(scene.get('a')?.rect).toEqual({ x: 10, y: 20, w: 10, h: 10 });
+  });
+
+  it('undoes a property change, which is an add over an existing id', () => {
+    interface Labelled extends SceneNode {
+      label: string;
+    }
+    const scene = new Scene<Labelled>({ cellSize: 32 });
+    scene.add({ id: 'a', rect: { x: 0, y: 0, w: 10, h: 10 }, label: 'before' });
+    scene.bringToFront('a');
+    scene.add({ id: 'b', rect: { x: 40, y: 0, w: 10, h: 10 }, label: 'other' });
+    const depth = scene.zOf('a');
+    const history = new History(scene);
+
+    const edited = { ...scene.get('a')!, label: 'after' };
+    history.run('edit', [{ op: 'add', node: edited }]);
+    expect(scene.get('a')?.label).toBe('after');
+    // A replacement keeps the node where it was in the stack.
+    expect(scene.zOf('a')).toBe(depth);
+
+    history.undo();
+    expect(scene.get('a')?.label).toBe('before');
+    expect(scene.zOf('a')).toBe(depth);
+
+    history.redo();
+    expect(scene.get('a')?.label).toBe('after');
+  });
+});

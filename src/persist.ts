@@ -96,6 +96,28 @@ export function deserializeInto<T extends SceneNode>(
   return scene;
 }
 
+/**
+ * Loads a document into a scene and camera that already exist.
+ *
+ * The document-level counterpart to {@link deserializeInto}, and wanted for
+ * the same reason one level up: a host that holds its camera — a React hook,
+ * a module that attached gestures to it — cannot use a loader that hands back
+ * a new one. The scene is validated before anything is cleared, and the camera
+ * is left alone when the snapshot carries none.
+ */
+export function deserializeDocumentInto<T extends SceneNode>(
+  target: { scene: Scene<T>; camera?: Camera },
+  snapshot: DocumentSnapshot<T>,
+): void {
+  if (snapshot === null || typeof snapshot !== 'object' || snapshot.v !== 1) {
+    throw new TypeError('deserializeDocumentInto: expected a version 1 document');
+  }
+  deserializeInto(target.scene, snapshot.scene);
+  if (snapshot.camera !== undefined && target.camera !== undefined) {
+    target.camera.setState(snapshot.camera);
+  }
+}
+
 export function deserializeDocument<T extends SceneNode>(
   snapshot: DocumentSnapshot<T>,
   options: SceneOptions = {},

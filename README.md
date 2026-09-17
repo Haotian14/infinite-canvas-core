@@ -113,11 +113,12 @@ counter; when to redraw stays the host's decision.
 - [x] **M1** — uniform-grid spatial index, viewport culling, benchmark harness
 - [x] **M2** — hit testing, selection, drag, marquee, snapping
 - [x] **M3** — command stack, undo/redo, serialisation
-- [ ] **M4** — React bindings, and a whiteboard demo built on the public API
+- [x] **M4** — React bindings, and a whiteboard demo built on the public API
 - [ ] **M5** — CRDT collaboration (Yjs or Loro), as a separate package
 
 The spatial index arrived during M0 because the benchmark could not produce a
-meaningful number without it.
+meaningful number without it. M4 changed five things in `src/` — every one of
+them found by building the whiteboard rather than by designing the bindings.
 
 Two caveats on what "done" means above:
 
@@ -234,6 +235,110 @@ looks loaded but is still driving the document you left behind. Validation runs
 before anything is cleared, so a bad snapshot throws and leaves the scene
 untouched.
 
+## React
+
+```bash
+npm i infinite-canvas-core react
+```
+
+A separate entry point, with React as an *optional* peer. The engine stays
+dependency-free and nothing in here is reachable — or bundled — unless it is
+imported: the bindings add 1.6 kB min+gzip on top of the 9.3 kB core.
+
+These are hooks, not components. A component would have to decide the markup
+and the styling of a thing whose whole point is that the host draws it.
+
+```tsx
+import { Camera, Canvas2DRenderer, History, Scene, Selection } from 'infinite-canvas-core';
+import {
+  useCanvas, useConstant, useGestures, useHistoryState, useSelectTool,
+} from 'infinite-canvas-core/react';
+
+function Board() {
+  // The document lives outside React. These are the same objects a vanilla
+  // host would hold; the hooks only watch them.
+  const camera = useConstant(() => new Camera());
+  const scene = useConstant(() => new Scene<Item>());
+  const selection = useConstant(() => new Selection());
+  const history = useConstant(() => new History(scene));
+
+  const { ref, element, invalidate } = useCanvas({
+    scene,
+    camera,
+    renderer: (canvas) => new Canvas2DRenderer(canvas),
+    watch: [selection],
+  });
+
+  useGestures(element, camera, { onChange: invalidate });
+  useSelectTool(element, { scene, camera, selection, history, onChange: invalidate });
+
+  const past = useHistoryState(history);
+  return (
+    <div className="board">
+      <canvas ref={ref} />
+      <button disabled={!past.canUndo} onClick={() => history.undo()}>undo</button>
+    </div>
+  );
+}
+```
+
+**React's cadence is the frame, not the mutation.** The engine reports change
+by incrementing a counter rather than by emitting events, and the bindings keep
+it that way: one shared animation frame polls the counters, so a drag that
+moves a hundred nodes per pointer event costs at most one render per subscriber
+per frame instead of hundreds. The loop runs only while something is watching.
+There is a test that forty camera changes between two frames produce exactly
+one render.
+
+**Rendering is on demand.** A frame is drawn when the camera, the scene or
+anything in `watch` has moved, or when you call `invalidate` for something the
+counters cannot see — a marquee rectangle, an image that finished loading. An
+idle board draws nothing at all; the demo measures zero frames over a second of
+sitting still.
+
+**Callbacks are read through a ref, value options by their values.** A handler
+written inline is a new function on every render; listing it as a dependency
+would tear the pointer listeners down and rebuild them sixty times a second
+mid-drag, and ignoring it would leave them calling the first render's closure.
+Passing a new `onChange` does not re-attach; changing `tolerance` does.
+
+`useCanvas` also owns the parts of the canvas lifecycle that are easy to get
+wrong: it measures the *parent*, because the renderer writes a pixel size onto
+the canvas's own style and measuring the canvas would measure what it just set;
+it watches `devicePixelRatio`, which changes with no resize event when a window
+moves between monitors; and it sets `display: block`, because an inline canvas
+inside a content-sized parent is a resize loop.
+
+The element arrives through state, so it is null on the first render and the
+input hooks take null and no-op. That also makes null the enable switch — the
+whiteboard detaches the select tool by passing null while a create tool is
+active, which leaves no stale marquee behind.
+
+### What the demo changed in the engine
+
+`examples/whiteboard` is built only on the public exports. Five things it could
+not do cleanly are now in `src/`:
+
+| added | because |
+| --- | --- |
+| `Camera.worldToScreenRect` | a text editor is DOM over the canvas, and it has to be positioned |
+| `Scene.queryOrdered` | `query` returns index order, which is right for culling and wrong for painting |
+| `deserializeDocumentInto` | the document loader returned a new camera, which no hook can hold |
+| `useCanvas`'s renderer type parameter | a host that wrote its own renderer needs its own methods back, not the interface |
+| `invertPatch` copies what it captures | an undo record must not alias an object the host still holds |
+
+A property change — text, colour, anything the engine does not model — is an
+`add` over an existing id: the node keeps its depth, and the inverse restores
+the node that was there.
+
+```ts
+history.run('edit text', [{ op: 'add', node: { ...node, text } }]);
+```
+
+The one rule that is easy to get wrong: record the change *before* applying it
+in place. Mutating a node and then recording it loses the previous value,
+because by then there is nowhere left to read it from.
+
 ## Input
 
 `attachGestures` covers the three input families from one state machine: the
@@ -302,11 +407,13 @@ src/
   select/              hit testing, selection, snapping, the pointer tool
   history/             patches, undo and redo
   persist.ts           scene and document snapshots
+  react/               hooks: canvas lifecycle, the shared frame, input
   math/rect.ts         rectangle primitives
 bench/                 headless benchmark runner and profile tooling
 examples/basic         the smallest useful program
 examples/select        select, drag, marquee, snap, undo and save/load
 examples/bench         100k-node playground, and the harness the runner drives
+examples/whiteboard    a React whiteboard on the public API — notes, text, undo
 site/                  the landing page, including a renderer of its own
 ```
 
@@ -317,6 +424,8 @@ pnpm test           # vitest
 pnpm typecheck      # tsc --noEmit, strict
 pnpm build          # dist/
 pnpm bench          # --stress for 1M nodes, --headed to watch, --reps=N
+pnpm whiteboard     # the React demo
+pnpm select         # the vanilla select/drag/undo demo
 ```
 
 The spatial index is property-tested against a brute-force scan: every query

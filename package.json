@@ -8,7 +8,9 @@
     "viewport",
     "pan-zoom",
     "whiteboard",
-    "headless"
+    "headless",
+    "react",
+    "undo-redo"
   ],
   "license": "MIT",
   "author": "Haotian14",
@@ -28,7 +30,12 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -36,6 +43,14 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   },
   "packageManager": "pnpm@10.33.0",
   "scripts": {
@@ -47,13 +62,20 @@
     "bench": "node bench/run.mjs && node bench/update-readme.mjs",
     "bench:headed": "node bench/run.mjs --headed",
     "site": "vite",
-    "build:site": "vite build",
+    "build:site": "vite build && pnpm build:whiteboard",
+    "build:whiteboard": "vite build examples/whiteboard --base ${SITE_BASE:-/infinite-canvas-core/}whiteboard/ --outDir ../../dist-site/whiteboard --emptyOutDir",
     "preview:site": "vite preview",
-    "select": "vite examples/select"
+    "select": "vite examples/select",
+    "whiteboard": "vite examples/whiteboard"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "jsdom": "^30.1.0",
     "playwright": "^1.63.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "^5.6.0",
     "vite": "^5.4.0",
     "vitest": "^2.1.0"

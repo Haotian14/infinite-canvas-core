@@ -44,6 +44,7 @@ export {
   deserializeScene,
   deserializeInto,
   deserializeDocument,
+  deserializeDocumentInto,
 } from './persist.js';
 export type { DocumentSnapshot, SceneSnapshot } from './persist.js';
 

@@ -94,6 +94,22 @@ export class Camera {
     return { x: p.x * this._scale + this._tx, y: p.y * this._scale + this._ty };
   }
 
+  /**
+   * A world rectangle in screen coordinates.
+   *
+   * For putting DOM over the canvas — a text editor on a node, a context menu,
+   * a resize handle. Doing it with two `worldToScreen` calls works and is the
+   * kind of arithmetic that ends up subtly wrong in every host that writes it.
+   */
+  worldToScreenRect(r: Rect): Rect {
+    return {
+      x: r.x * this._scale + this._tx,
+      y: r.y * this._scale + this._ty,
+      w: r.w * this._scale,
+      h: r.h * this._scale,
+    };
+  }
+
   screenToWorld(p: Vec2): Vec2 {
     return { x: (p.x - this._tx) / this._scale, y: (p.y - this._ty) / this._scale };
   }
