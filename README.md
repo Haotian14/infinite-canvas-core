@@ -309,6 +309,12 @@ it watches `devicePixelRatio`, which changes with no resize event when a window
 moves between monitors; and it sets `display: block`, because an inline canvas
 inside a content-sized parent is a resize loop.
 
+A resize redraws **synchronously**, which is the one place the on-demand loop
+does not get to defer. Sizing the backing store wipes it — to opaque black, for
+a canvas with `alpha: false` — and a `ResizeObserver` runs *after* the frame
+callbacks, so a redraw left to the next frame is one the browser paints the
+cleared canvas before. Dragging a window edge flashes black on every step.
+
 The element arrives through state, so it is null on the first render and the
 input hooks take null and no-op. That also makes null the enable switch — the
 whiteboard detaches the select tool by passing null while a create tool is

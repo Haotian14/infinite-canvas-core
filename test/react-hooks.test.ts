@@ -113,6 +113,48 @@ describe('useCanvas', () => {
     expect(built[0]!.frames).toBe(1);
   });
 
+  it('redraws in the same tick as a resize, not on the next frame', () => {
+    const scene = new Scene();
+    const camera = new Camera();
+    const built: FakeRenderer[] = [];
+
+    mount(
+      createElement(function Probe() {
+        const handle = useCanvas({
+          scene,
+          camera,
+          renderer: () => {
+            const renderer = new FakeRenderer();
+            built.push(renderer);
+            return renderer;
+          },
+        });
+        return createElement('canvas', { ref: handle.ref });
+      }),
+    );
+
+    const renderer = built[0]!;
+    expect(renderer.resizes).toHaveLength(1);
+    expect(renderer.frames).toBe(1);
+
+    Object.defineProperty(host, 'clientWidth', { value: 900, configurable: true });
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    // No frame has been stepped. Sizing the backing store wipes it - to
+    // opaque black, with `alpha: false` - and a ResizeObserver runs after the
+    // frame callbacks, so a redraw deferred to the next frame is one the
+    // browser paints the cleared canvas before. Dragging a window edge then
+    // flashes on every step.
+    expect(renderer.resizes).toHaveLength(2);
+    expect(renderer.frames).toBe(2);
+
+    // And the frame that follows does not repaint what just went out.
+    step();
+    expect(renderer.frames).toBe(2);
+  });
+
   it('draws nothing while nothing changes', () => {
     const scene = new Scene();
     const camera = new Camera();

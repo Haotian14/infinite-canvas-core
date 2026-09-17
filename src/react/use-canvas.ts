@@ -112,9 +112,20 @@ export function useCanvas<T extends SceneNode, R extends Renderer<T> = Renderer<
     let width = 0;
     let height = 0;
     let dpr = 0;
+    let drawn = -1;
+
+    // One counter for everything worth redrawing for. Versions only ever go
+    // up, so their sum moves whenever any of them does, and the whole canvas
+    // needs a single watcher rather than one per source.
+    const state = (): number => {
+      let total = dirty + camera.version + scene.version;
+      for (const source of watched) total += source.version;
+      return total;
+    };
 
     const draw = (): void => {
       if (width <= 0 || height <= 0) return;
+      drawn = state();
       const stats = backend.render(scene, camera);
       latest.current.onRender?.(stats);
     };
@@ -136,7 +147,12 @@ export function useCanvas<T extends SceneNode, R extends Renderer<T> = Renderer<
       camera.setViewport(width, height);
       backend.resize(width, height, dpr);
       latest.current.onResize?.(width, height, dpr);
-      dirty++;
+      // Synchronously, not on the next frame. Sizing the backing store wipes
+      // it - to opaque black, for a canvas with `alpha: false` - and a
+      // ResizeObserver runs *after* the frame callbacks, so a redraw left to
+      // the next frame is one the browser paints the cleared canvas before.
+      // Dragging a window edge then flashes black on every step.
+      draw();
     };
 
     const host = element.parentElement;
@@ -179,25 +195,14 @@ export function useCanvas<T extends SceneNode, R extends Renderer<T> = Renderer<
     };
     watchRatio();
 
+    // `measure` draws, so the canvas is never briefly blank on mount either.
     measure();
-    // Draw the first frame now rather than a frame later, so the canvas is
-    // never briefly blank.
-    dirty = 0;
-    draw();
 
-    // One counter for everything worth redrawing for. Versions only ever go
-    // up, so their sum moves whenever any of them does, and the whole canvas
-    // needs a single watcher rather than one per source.
-    const unwatch = watchVersion(
-      () => {
-        let total = dirty + camera.version + scene.version;
-        for (const source of watched) total += source.version;
-        return total;
-      },
-      // Called from inside the shared frame, so this draws in the frame the
-      // change was noticed rather than scheduling another one.
-      draw,
-    );
+    const unwatch = watchVersion(state, () => {
+      // `draw` records the state it drew, so a frame that already went out
+      // synchronously - from a resize - is not painted twice.
+      if (state() !== drawn) draw();
+    });
     invalidateRef.current = () => {
       dirty++;
     };
