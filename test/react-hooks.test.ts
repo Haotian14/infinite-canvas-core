@@ -7,7 +7,7 @@ import type { Root } from 'react-dom/client';
 import { Camera, Scene, Selection } from '../src/index.js';
 import type { RenderStats, Renderer, SceneNode } from '../src/index.js';
 import { setFrameScheduler } from '../src/react/frame.js';
-import { useCanvas, useSelectTool, useVersion } from '../src/react/index.js';
+import { useCanvas, useGestures, useSelectTool, useVersion } from '../src/react/index.js';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -318,6 +318,56 @@ describe('useCanvas', () => {
     step();
     expect(built[0]!.frames).toBe(stale);
     expect(built[1]!.frames).toBe(2);
+  });
+});
+
+describe('unmounting', () => {
+  it('leaves no listener behind and stops the frame loop', () => {
+    const scene = new Scene();
+    const camera = new Camera().setViewport(400, 400);
+    const selection = new Selection();
+    const built: FakeRenderer[] = [];
+
+    const Probe = function Probe() {
+      const handle = useCanvas({
+        scene,
+        camera,
+        renderer: () => {
+          const renderer = new FakeRenderer();
+          built.push(renderer);
+          return renderer;
+        },
+      });
+      useGestures(handle.element, camera, { panButtons: [0] });
+      useSelectTool(handle.element, { scene, camera, selection });
+      return createElement('canvas', { ref: handle.ref });
+    };
+
+    mount(createElement(Probe));
+    const canvas = host.querySelector('canvas')!;
+    const press = (type: string, x: number, y: number): void => {
+      const event = new MouseEvent(type, { clientX: x, clientY: y, button: 0, bubbles: true });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      Object.defineProperty(event, 'pointerType', { value: 'mouse' });
+      canvas.dispatchEvent(event);
+    };
+
+    press('pointerdown', 100, 100);
+    press('pointermove', 160, 130);
+    expect(camera.tx).not.toBe(0);
+    const moved = camera.tx;
+
+    mount(null);
+
+    // The element is detached, but a leaked listener would still be on it.
+    press('pointerdown', 100, 100);
+    press('pointermove', 400, 400);
+    expect(camera.tx).toBe(moved);
+    expect(built[0]!.destroyed).toBe(true);
+
+    // And nothing is still asking for frames.
+    step();
+    expect(queue).toHaveLength(0);
   });
 });
 

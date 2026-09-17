@@ -33,6 +33,22 @@ export interface GestureOptions {
    * leave panning to two.
    */
   singleTouch?: 'pan' | 'ignore';
+  /**
+   * What to write to the element's `touch-action`, or `false` to leave the
+   * stylesheet in charge.
+   *
+   * The default follows `singleTouch`: `'none'` when one finger pans, because
+   * the browser's own scrolling would swallow it, and `'pan-x pan-y'` when one
+   * finger is ignored, so an embedded canvas does not make the page it sits in
+   * unscrollable.
+   *
+   * That default is wrong for a full-screen app that puts *tools* on one
+   * finger: the browser claims the gesture as a scroll and cancels the pointer
+   * stream a few events in, so a drag stops after a few pixels. Such an app
+   * wants `'none'` with `singleTouch: 'ignore'`, which is why this is a
+   * separate option rather than something `singleTouch` decides.
+   */
+  touchAction?: string | false;
   /** Kinetic panning after a flick. Default true. */
   inertia?: boolean | InertiaOptions;
   /** Overridable clock and frame scheduler, so the state machine is testable. */
@@ -104,7 +120,7 @@ export function attachGestures(
   const cancelFrame = options.cancelFrame ?? ((handle) => cancelAnimationFrame(handle));
 
   /** Pointers currently driving the camera, in client coordinates. */
-  const pointers = new Map<number, Vec2>();
+  const pointers = new Map<number, Vec2 & { touch: boolean }>();
   let anchor: Vec2 = { x: 0, y: 0 };
   let spread = 0;
   let spaceHeld = false;
@@ -251,9 +267,24 @@ export function attachGestures(
 
   // --- pointers -------------------------------------------------------------
 
+  /** Whether this pointer is tracked at all. */
   const participates = (event: PointerEvent): boolean => {
-    if (event.pointerType === 'touch') return singleTouch === 'pan' || pointers.size >= 1;
+    // Every finger is tracked, including one this instance will not pan with:
+    // deciding that from `pointers.size` would mean the first finger is never
+    // recorded, so the second one never sees a first and two-finger panning
+    // could never start. Tracking and driving are separate questions.
+    if (event.pointerType === 'touch') return true;
     return panButtons.includes(event.button) || (spaceHeld && event.button === 0);
+  };
+
+  /** Whether the pointers currently down should be moving the camera. */
+  const driving = (): boolean => {
+    if (pointers.size === 0) return false;
+    if (singleTouch === 'pan') return true;
+    let touches = 0;
+    for (const p of pointers.values()) if (p.touch) touches++;
+    // A lone finger belongs to the host's tools; two work the camera.
+    return touches === 0 || touches >= 2;
   };
 
   const onPointerDown = (event: PointerEvent): void => {
@@ -261,13 +292,23 @@ export function attachGestures(
     stopInertia();
     samples = [];
 
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    pointers.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY,
+      touch: event.pointerType === 'touch',
+    });
     // Baseline before capturing. `setPointerCapture` throws when the pointer
     // is no longer active — a synthetic event, or a real one whose pointer was
     // released between dispatch and handler — and an exception here would
     // otherwise leave `anchor` stale, so the next move pans by the pointer's
-    // absolute position instead of its delta.
+    // absolute position instead of its delta. Baselining here is also what
+    // makes the finger that starts a two-finger pan not jump the content.
     rebase();
+    // A pointer that is only being watched is left entirely alone: no capture,
+    // no preventDefault, no sample. It belongs to the host until a second
+    // finger turns the pair into a camera gesture.
+    if (!driving()) return;
+
     recordSample(anchor);
     try {
       element.setPointerCapture?.(event.pointerId);
@@ -279,8 +320,13 @@ export function attachGestures(
   };
 
   const onPointerMove = (event: PointerEvent): void => {
-    if (!pointers.has(event.pointerId)) return;
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const tracked = pointers.get(event.pointerId);
+    if (tracked === undefined) return;
+    tracked.x = event.clientX;
+    tracked.y = event.clientY;
+    // Position is kept up to date either way, so that the moment a second
+    // finger arrives `rebase` has somewhere true to start from.
+    if (!driving()) return;
 
     const { center, spread: nextSpread } = measure();
 
@@ -332,8 +378,10 @@ export function attachGestures(
   // usually embedded in a scrolling page, and taking 'none' there would leave
   // the page unscrollable everywhere the element covers.
   const previousTouchAction = element.style?.touchAction ?? '';
-  if (element.style) {
-    element.style.touchAction = singleTouch === 'ignore' ? 'pan-x pan-y' : 'none';
+  const touchAction =
+    options.touchAction ?? (singleTouch === 'ignore' ? 'pan-x pan-y' : 'none');
+  if (element.style && touchAction !== false) {
+    element.style.touchAction = touchAction;
   }
 
   if (wheelMode !== 'none') element.addEventListener('wheel', onWheel, { passive: false });
@@ -346,7 +394,9 @@ export function attachGestures(
 
   return {
     get isPanning() {
-      return pointers.size > 0;
+      // Tracked is not the same as driving: a lone finger on an instance that
+      // ignores one is watched, not panning.
+      return driving();
     },
     get isGliding() {
       return glideHandle !== null;

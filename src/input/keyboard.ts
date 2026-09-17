@@ -87,6 +87,11 @@ export function attachKeyboard(camera: Camera, options: KeyboardOptions = {}): K
         handled = fit(options.getSelectionBounds?.());
         break;
 
+      // Deliberately not guarded on the modifier, unlike everything else here:
+      // cmd/ctrl + `=` and `-` are what people reach for to zoom a canvas, and
+      // every canvas tool binds them, so the browser's page zoom loses. An
+      // embedded canvas that should not take them over passes its own
+      // `target` rather than the window.
       case 'Equal':
       case 'NumpadAdd':
         camera.zoomBy(zoomStep);

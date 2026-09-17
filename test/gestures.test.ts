@@ -157,14 +157,74 @@ describe('touch', () => {
   });
 
   it('ignores one finger when configured to', () => {
-    attach({ singleTouch: 'ignore', inertia: false });
+    const handle = attach({ singleTouch: 'ignore', inertia: false });
     element.dispatch('pointerdown', touch(1, 100, 100));
     element.dispatch('pointermove', touch(1, 160, 130));
     expect(camera.tx).toBe(0);
+    expect(handle.isPanning).toBe(false);
+    // A finger this instance will not pan with is left entirely alone, so the
+    // host's own tool keeps it.
+    expect(element.capturedCount()).toBe(0);
+  });
 
-    // A second finger still starts a pinch.
+  it('pans with two fingers when one is ignored', () => {
+    // The whole point of `ignore`: one finger belongs to the app, two work the
+    // camera. Deciding that from the number of tracked pointers used to mean
+    // the first finger was never recorded, so the second never saw a first and
+    // this could not start at all.
+    const handle = attach({ singleTouch: 'ignore', inertia: false });
+    element.dispatch('pointerdown', touch(1, 100, 100));
     element.dispatch('pointerdown', touch(2, 300, 100));
-    expect(camera.version).toBeGreaterThanOrEqual(0);
+    expect(handle.isPanning).toBe(true);
+
+    element.dispatch('pointermove', touch(1, 140, 140));
+    element.dispatch('pointermove', touch(2, 340, 140));
+    // Not exact: the fingers arrive one event at a time, so between the two
+    // moves the spread really does change and the pinch really does fire.
+    expect(camera.tx).toBeCloseTo(40, 6);
+    expect(camera.ty).toBeCloseTo(40, 6);
+  });
+
+  it('pinches with two fingers when one is ignored', () => {
+    attach({ singleTouch: 'ignore', inertia: false });
+    element.dispatch('pointerdown', touch(1, 100, 100));
+    element.dispatch('pointerdown', touch(2, 300, 100));
+
+    element.dispatch('pointermove', touch(1, 50, 100));
+    element.dispatch('pointermove', touch(2, 350, 100));
+    expect(camera.scale).toBeCloseTo(1.5, 6);
+  });
+
+  it('stops panning when a two-finger gesture drops back to one', () => {
+    const handle = attach({ singleTouch: 'ignore', inertia: false });
+    element.dispatch('pointerdown', touch(1, 100, 100));
+    element.dispatch('pointerdown', touch(2, 300, 100));
+    element.dispatch('pointermove', touch(1, 140, 100));
+    element.dispatch('pointermove', touch(2, 340, 100));
+    const afterTwo = camera.tx;
+
+    element.dispatch('pointerup', touch(2, 340, 100));
+    expect(handle.isPanning).toBe(false);
+    // The finger still down belongs to the host again, and moving it a long
+    // way must not drag the view with it.
+    element.dispatch('pointermove', touch(1, 700, 400));
+    expect(camera.tx).toBe(afterTwo);
+  });
+
+  it('keeps tracking the ignored finger, so the pair does not jump', () => {
+    attach({ singleTouch: 'ignore', inertia: false });
+    element.dispatch('pointerdown', touch(1, 100, 100));
+    // The first finger wanders while the host drags something with it.
+    element.dispatch('pointermove', touch(1, 200, 200));
+    element.dispatch('pointerdown', touch(2, 400, 200));
+    // Panning starts from where the fingers actually are, not from where the
+    // first one landed: no motion until they move.
+    expect(camera.tx).toBe(0);
+    expect(camera.ty).toBe(0);
+
+    element.dispatch('pointermove', touch(1, 210, 200));
+    element.dispatch('pointermove', touch(2, 410, 200));
+    expect(camera.tx).toBeCloseTo(10, 6);
   });
 
   it('pinches to zoom while keeping the world under the centroid fixed', () => {
@@ -310,6 +370,22 @@ describe('lifecycle', () => {
     expect(element.style.touchAction).toBe('pan-x pan-y');
     handle.detach();
     expect(element.style.touchAction).toBe('auto');
+  });
+
+  it('lets the host decide touch-action', () => {
+    // An app that puts tools on one finger needs that finger: `pan-x pan-y`
+    // lets the browser claim the gesture as a scroll and cancel the pointer
+    // stream, and the drag stops after a few pixels.
+    const handle = attach({ singleTouch: 'ignore', touchAction: 'none' });
+    expect(element.style.touchAction).toBe('none');
+    handle.detach();
+    expect(element.style.touchAction).toBe('auto');
+  });
+
+  it('leaves touch-action alone when told to', () => {
+    const handle = attach({ touchAction: false });
+    expect(element.style.touchAction).toBe('auto');
+    handle.detach();
   });
 
   it('takes over touch-action and restores it on detach', () => {

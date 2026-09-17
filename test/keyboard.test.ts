@@ -135,6 +135,21 @@ describe('attachKeyboard', () => {
     expect(camera.scale).toBeGreaterThan(1);
   });
 
+  it('zooms on the modifier too, taking the browser\'s page zoom', () => {
+    // Deliberate, and the one binding here that does not stand down for a
+    // modifier: cmd/ctrl + `=` is what people press to zoom a canvas. Pinned
+    // by a test so it stays a decision rather than drifting back into an
+    // oversight.
+    attach();
+    for (const mod of [{ metaKey: true }, { ctrlKey: true }]) {
+      camera.zoomTo(1);
+      expect(target.press('Equal', mod)).toBe(true);
+      expect(camera.scale).toBeCloseTo(1.25, 9);
+      expect(target.press('Minus', mod)).toBe(true);
+      expect(camera.scale).toBeCloseTo(1, 9);
+    }
+  });
+
   it('ignores anything with alt held, and unbinds on detach', () => {
     const handle = attach();
     expect(target.press('Equal', { altKey: true })).toBe(false);

@@ -358,7 +358,7 @@ edges.
 | wheel / two-finger scroll | pan |
 | ctrl+wheel, trackpad pinch | zoom, anchored under the cursor |
 | middle-drag, space+left-drag | pan |
-| one finger | pan (set `singleTouch: 'ignore'` to leave it for selection) |
+| one finger | pan (set `singleTouch: 'ignore'` to leave it for the host's tools) |
 | two fingers | pinch zoom and pan together |
 | flick | coasts to a stop; `inertia: false` turns it off |
 
@@ -378,7 +378,7 @@ attachKeyboard(camera, { getContentBounds: () => scene.bounds() });
 | `cmd`/`ctrl` + `0` | back to 100% |
 | `shift` + `1` | fit the content |
 | `shift` + `2` | fit the selection (needs `getSelectionBounds`) |
-| `+` / `-` | zoom about the viewport centre |
+| `+` / `-`, with or without `cmd`/`ctrl` | zoom about the viewport centre |
 | arrows | pan; hold `shift` for a tenth of a step |
 
 ### Embedding in a page that scrolls
@@ -399,6 +399,25 @@ input before any handler saw it. How much it takes depends on `singleTouch`: a
 canvas that ignores a single finger gets `pan-x pan-y` rather than `none`, since
 taking `none` there would make the document unscrollable everywhere the element
 covers.
+
+That default is for an embedded canvas. A **full-screen app that puts tools on
+one finger** wants the opposite and has to say so:
+
+```ts
+attachGestures(canvas, camera, {
+  singleTouch: 'ignore', // one finger is the select tool's
+  touchAction: 'none',   // ...so the browser must not claim it as a scroll
+});
+```
+
+Without it the browser decides a few events in that the gesture is a scroll,
+sends `pointercancel`, and the drag stops after a few pixels. `touchAction`
+also takes `false`, which leaves the stylesheet in charge.
+
+`cmd`/`ctrl` + `=` and `-` are taken over too, which is what every canvas tool
+does and what people expect — but it does mean page zoom is gone for as long as
+`attachKeyboard` is bound to the window. An embedded canvas that should not do
+that passes its own `target`.
 
 ## Layout
 

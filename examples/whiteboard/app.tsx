@@ -40,6 +40,7 @@ export function App(): JSX.Element {
 
   const [tool, setTool] = useState<Tool>('select');
   const [editing, setEditing] = useState<NodeId | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const framed = useRef(false);
   const statsRef = useRef<RenderStats | null>(null);
@@ -89,6 +90,10 @@ export function App(): JSX.Element {
     onChange: invalidate,
     // One finger belongs to the tools on a board; two fingers pan.
     singleTouch: 'ignore',
+    // And because the tools need that finger, the browser must not be allowed
+    // to claim it as a scroll — it cancels the pointer stream a few events in,
+    // and a drag stops after a few pixels.
+    touchAction: 'none',
   });
 
   useKeyboard(camera, {
@@ -208,18 +213,42 @@ export function App(): JSX.Element {
   }, [history, selection]);
 
   const save = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeDocument(scene, camera)));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeDocument(scene, camera)));
+      setNotice('saved');
+    } catch {
+      // Private browsing, or the quota is full. Neither is the app's fault and
+      // neither should take the board down with it.
+      setNotice('could not save');
+    }
   }, [scene, camera]);
 
   const load = useCallback(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    // Into the scene and camera this component already holds. A loader that
-    // returned new ones would leave every hook above driving the old document.
-    deserializeDocumentInto({ scene, camera }, JSON.parse(raw));
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(STORAGE_KEY);
+    } catch {
+      raw = null;
+    }
+    if (!raw) {
+      setNotice('nothing saved');
+      return;
+    }
+    try {
+      // Into the scene and camera this component already holds. A loader that
+      // returned new ones would leave every hook above driving the old
+      // document. Anything stored by an older version, or edited by hand, or
+      // half-written by a crashed tab, arrives here too - and the loader
+      // validates before it clears, so a throw leaves the board untouched.
+      deserializeDocumentInto({ scene, camera }, JSON.parse(raw));
+    } catch {
+      setNotice('saved document could not be read');
+      return;
+    }
     reserveIds([...scene.all()].map((node) => node.id));
     selection.prune(scene);
     history.clear();
+    setNotice('loaded');
     invalidate();
   }, [scene, camera, selection, history, invalidate]);
 
@@ -244,10 +273,15 @@ export function App(): JSX.Element {
       } else if (mod && event.code === 'KeyO') {
         event.preventDefault();
         load();
-      } else if (event.code === 'KeyV') setTool('select');
-      else if (event.code === 'KeyN') setTool('note');
-      else if (event.code === 'KeyR') setTool('rect');
-      else if (event.code === 'KeyE') setTool('ellipse');
+      } else if (!mod) {
+        // Guarded, or cmd+R would pick the rectangle tool on its way to
+        // reloading the page, and cmd+E and cmd+N would fire on their way to
+        // whatever the browser does with them.
+        if (event.code === 'KeyV') setTool('select');
+        else if (event.code === 'KeyN') setTool('note');
+        else if (event.code === 'KeyR') setTool('rect');
+        else if (event.code === 'KeyE') setTool('ellipse');
+      }
     };
     addEventListener('keydown', onKeyDown);
     return () => removeEventListener('keydown', onKeyDown);
@@ -257,6 +291,12 @@ export function App(): JSX.Element {
   useEffect(() => {
     Object.assign(window, { __wb: { scene, camera, selection, history } });
   }, [scene, camera, selection, history]);
+
+  useEffect(() => {
+    if (notice === null) return;
+    const id = setTimeout(() => setNotice(null), 2200);
+    return () => clearTimeout(id);
+  }, [notice]);
 
   const view = useCameraState(camera);
   const past = useHistoryState(history);
@@ -348,6 +388,7 @@ export function App(): JSX.Element {
         <span className="wide">{stats ? `${stats.drawn} drawn / ${stats.culled} culled` : '—'}</span>
         <span>{stats ? `${stats.durationMs.toFixed(2)} ms` : '—'}</span>
         <span className="wide">{past.depth} undo steps</span>
+        {notice && <span className="notice">{notice}</span>}
       </footer>
     </>
   );
